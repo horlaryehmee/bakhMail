@@ -1,5 +1,7 @@
 # TaskManager Laravel App
 
+Developed By Bakare Olayemi.
+
 This app is now the Laravel-only version of the workspace.
 
 ## Stack

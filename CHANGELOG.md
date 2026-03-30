@@ -1,5 +1,7 @@
 # Release Notes
 
+Developed By Bakare Olayemi.
+
 ## [Unreleased](https://github.com/laravel/laravel/compare/v13.1.0...13.x)
 
 ## [v13.1.0](https://github.com/laravel/laravel/compare/v12.12.2...v13.1.0) - 2026-03-18
