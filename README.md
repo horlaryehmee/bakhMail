@@ -12,6 +12,25 @@ This app is now the Laravel-only version of the workspace.
 - Tailwind / Vite
 - SQLite or MySQL
 
+## Production install
+
+For cPanel or any normal PHP host:
+
+1. Upload the Laravel app, but do not ship your local `.env` file. Let the installer create the server `.env`.
+2. Point the domain or subdomain document root to `public/`.
+3. Open `/install`.
+4. Enter:
+   - MySQL host, port, database name, username, and password
+   - the first Master Admin name, email, and password
+5. Submit the installer.
+
+The installer will:
+
+- write the `.env` file
+- run the migrations
+- create the first Master Admin account
+- lock the installer so the app opens normally afterward
+
 ## Local run
 
 1. Install PHP dependencies:

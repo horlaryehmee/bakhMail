@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use App\Http\Middleware\EnsureApplicationInstalled;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\EnsureWorkspaceRole;
 use App\Http\Middleware\ResolveWorkspaceUser;
@@ -20,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->alias([
+            'app.installed' => EnsureApplicationInstalled::class,
             'workspace.auth' => ResolveWorkspaceUser::class,
             'workspace.role' => EnsureWorkspaceRole::class,
         ]);
