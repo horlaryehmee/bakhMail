@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": false,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "resources/js/*"
+      ]
+    },
+    "types": [
+      "vite/client"
+    ],
+    "allowJs": true,
+    "noEmit": true
+  },
+  "include": [
+    "resources/js/**/*",
+    "vite.config.js"
+  ]
+}
