@@ -145,7 +145,7 @@ export function SelectField(props: React.SelectHTMLAttributes<HTMLSelectElement>
     <select
       {...props}
       className={cn(
-        "w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-accent-400 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100",
+        "w-full appearance-none rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-accent-400 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100 dark:[color-scheme:dark]",
         props.className
       )}
     />

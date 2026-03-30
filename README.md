@@ -1,71 +1,54 @@
-# TaskManager V2
+# TaskManager Laravel App
 
-This folder is the Laravel + Inertia + React web-app version of the original TaskManager workspace. The UI now runs through Laravel while reusing the working React workspace and talking to the existing API/backend.
+This app is now the Laravel-only version of the workspace.
 
 ## Stack
 
 - Laravel 13
-- Inertia.js
-- React 19
-- Vite
-- Tailwind CSS 4
-- Existing TaskManager API for auth, projects, tasks, chat, requests, users, notifications, and branding
+- Inertia
+- React
+- Tailwind / Vite
+- SQLite or MySQL
 
-## Current Routes
+## Local run
 
-- `/` -> full workspace app
-- `/dashboard` -> same workspace app
-- `/up` -> Laravel health route
-
-## Run Locally
-
-1. Start the existing backend API from the original TaskManager app so `VITE_API_URL` is reachable.
-2. Open a terminal in `laravel-app`.
-3. Install PHP dependencies:
+1. Install PHP dependencies:
 
 ```bash
-composer install --no-dev
+composer install
 ```
 
-4. Install frontend dependencies:
+2. Install frontend dependencies:
 
 ```bash
 npm install
 ```
 
-5. Create the environment file if it does not exist:
+3. Run the database setup:
 
 ```bash
-cp .env.example .env
+php artisan migrate:fresh --seed
 ```
 
-6. Generate the Laravel app key:
+4. Start Laravel:
 
 ```bash
-php artisan key:generate
+php artisan serve --host=127.0.0.1 --port=8090
 ```
 
-7. Make sure `.env` points to the backend API:
-
-```env
-VITE_API_URL=http://localhost:4000/api
-```
-
-8. Build the frontend bundle:
+5. Start Vite during development:
 
 ```bash
-npm run build
+npm run dev
 ```
 
-9. Start the Laravel server:
+## Default login
 
-```bash
-php artisan serve
-```
+- `admin@bakhtech.com`
+- `BakhtechAdmin123!`
 
-Then open the URL shown by `php artisan serve`.
+The database seeder also populates demo users, projects, tasks, requests, comments, notifications, and branding for the workspace.
 
-## Notes
+## API
 
-- The Laravel app now serves the real workspace UI instead of the earlier static preview.
-- The backend runtime is still the original TaskManager API. This keeps the current feature set working while the UI stack moves to Laravel + Inertia + React.
+The frontend now talks to Laravel's own `/api` routes. It no longer depends on the old Node backend.

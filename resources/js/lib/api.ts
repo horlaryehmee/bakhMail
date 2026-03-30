@@ -1,5 +1,4 @@
-export const apiBaseUrl = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
-const apiOrigin = apiBaseUrl.replace(/\/api\/?$/, "");
+export const apiBaseUrl = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api";
 
 type RequestOptions = {
   token?: string | null;
@@ -11,6 +10,8 @@ type RequestOptions = {
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers = new Headers(options.headers);
   let body = options.body as BodyInit | null | undefined;
+
+  headers.set("Accept", "application/json");
 
   if (options.body && !(options.body instanceof FormData) && typeof options.body !== "string") {
     headers.set("Content-Type", "application/json");
@@ -49,9 +50,5 @@ export function assetUrl(url?: string | null) {
     return url;
   }
 
-  return `${apiOrigin}${url}`;
-}
-
-export function socketUrl() {
-  return apiOrigin;
+  return url;
 }

@@ -28,7 +28,7 @@ import {
 import { startTransition, useDeferredValue, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
 
-import { apiBaseUrl, apiRequest, assetUrl, socketUrl } from "@/lib/api";
+import { apiBaseUrl, apiRequest, assetUrl } from "@/lib/api";
 import type {
   Attachment,
   BrandingSettings,
@@ -91,46 +91,6 @@ const defaultBranding: BrandingSettings = {
   logoSize: 1
 };
 const voiceNoteMimeTypeOptions = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus", "audio/ogg", "audio/mpeg"];
-
-type SocketClient = {
-  disconnect: () => void;
-  emit: (event: string, payload: string[]) => void;
-  on: (event: string, callback: (...args: any[]) => void) => void;
-};
-
-async function loadSocketIo() {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const socketWindow = window as Window & {
-    io?: (url: string, options: Record<string, unknown>) => SocketClient;
-  };
-
-  if (socketWindow.io) {
-    return socketWindow.io;
-  }
-
-  await new Promise<void>((resolve, reject) => {
-    const existingScript = document.querySelector<HTMLScriptElement>('script[data-socket-io="true"]');
-
-    if (existingScript) {
-      existingScript.addEventListener("load", () => resolve(), { once: true });
-      existingScript.addEventListener("error", () => reject(new Error("Unable to load Socket.io client")), { once: true });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = "/vendor/socket.io.min.js";
-    script.async = true;
-    script.dataset.socketIo = "true";
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Unable to load Socket.io client"));
-    document.head.appendChild(script);
-  });
-
-  return socketWindow.io ?? null;
-}
 
 function useInviteToken() {
   const [inviteToken, setInviteToken] = useState<string | null>(null);
@@ -1320,7 +1280,6 @@ const notificationPreferenceOptions: Array<{
 
 export function DashboardApp() {
   const inviteToken = useInviteToken();
-  const socketRef = useRef<SocketClient | null>(null);
 
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [loading, setLoading] = useState(true);
@@ -1570,38 +1529,24 @@ export function DashboardApp() {
   useEffect(() => {
     if (!session?.token) return;
 
-    let active = true;
+    const refresh = () => void refreshWorkspace(session.token!, true);
+    const interval = window.setInterval(refresh, 30000);
+    const handleFocus = () => refresh();
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        refresh();
+      }
+    };
 
-    void loadSocketIo().then((createSocket) => {
-      if (!active || !createSocket) return;
-
-      const socket = createSocket(socketUrl(), {
-        auth: { token: session.token },
-        transports: ["websocket"]
-      });
-
-      socketRef.current = socket;
-      socket.on("connect", () => {
-        socket.emit(
-          "projects:watch",
-          projects.map((project) => project._id)
-        );
-      });
-      socket.on("workspace:update", () => {
-        void refreshWorkspace(session.token, true);
-      });
-      socket.on("notification:new", (notification: NotificationItem) => {
-        setNotifications((current) => [notification, ...current]);
-        pushToast(notification.title, notification.message);
-      });
-    });
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
-      active = false;
-      socketRef.current?.disconnect();
-      socketRef.current = null;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [projects, session?.token]);
+  }, [session?.token]);
 
   useEffect(() => {
     if (selectedTaskId && !tasks.some((task) => task._id === selectedTaskId && taskProjectId(task) === selectedProjectId)) {

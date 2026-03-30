@@ -114,6 +114,17 @@ textarea {
     font: inherit;
 }
 
+.dark select {
+    background-color: rgba(9, 15, 27, 0.92);
+    color: #f5f7fb;
+}
+
+.dark select option,
+.dark select optgroup {
+    background-color: #0b1321;
+    color: #f5f7fb;
+}
+
 .surface {
     background: var(--surface);
     border: 1px solid var(--border);
