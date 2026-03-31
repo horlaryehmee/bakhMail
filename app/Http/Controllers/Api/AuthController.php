@@ -328,7 +328,7 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'token' => ['required', 'string', 'min:10'],
             'name' => ['required', 'string', 'min:2', 'max:120'],
-            'password' => ['required', 'string', 'min:10', 'max:128', 'regex:/[a-z]/', 'regex:/[A-Z]/', 'regex:/[0-9]/', 'regex:/[^A-Za-z0-9]/'],
+            'password' => ['required', 'string', 'min:10', 'max:128', 'confirmed', 'regex:/[a-z]/', 'regex:/[A-Z]/', 'regex:/[0-9]/', 'regex:/[^A-Za-z0-9]/'],
             'title' => ['nullable', 'string', 'max:80'],
         ]);
         $validator->validate();

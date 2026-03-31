@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, FolderKanban, LockKeyhole, Mail, MessagesSquare } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, FolderKanban, LockKeyhole, Mail, MessagesSquare } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { BrandingSettings, UserRole } from "@/lib/types";
@@ -29,13 +29,17 @@ export function AuthScreen({
   loading: boolean;
   error: string | null;
   onLogin: (email: string, password: string) => Promise<void>;
-  onRegister: (payload: { token: string; name: string; password: string }) => Promise<void>;
+  onRegister: (payload: { token: string; name: string; password: string; passwordConfirmation: string }) => Promise<void>;
 }) {
   const [mode, setMode] = useState<"login" | "invite">(inviteToken ? "invite" : "login");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [loginPasswordVisible, setLoginPasswordVisible] = useState(false);
   const [registerName, setRegisterName] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
+  const [registerPasswordConfirmation, setRegisterPasswordConfirmation] = useState("");
+  const [registerPasswordVisible, setRegisterPasswordVisible] = useState(false);
+  const [registerPasswordConfirmationVisible, setRegisterPasswordConfirmationVisible] = useState(false);
 
   useEffect(() => {
     if (!inviteToken) {
@@ -53,6 +57,8 @@ export function AuthScreen({
 
   const inviteReady = Boolean(inviteToken && inviteInfo?.email && inviteInfo.status === "pending");
   const showInviteTabs = Boolean(inviteToken && inviteInfo?.status === "pending");
+  const registerPasswordsMatch = registerPassword === registerPasswordConfirmation;
+  const showRegisterPasswordMismatch = registerPasswordConfirmation.trim().length > 0 && !registerPasswordsMatch;
   const inviteNotice =
     inviteInfo?.status === "accepted"
       ? "This invite has already been used. Sign in with the invited email to continue."
@@ -170,12 +176,13 @@ export function AuthScreen({
                   </div>
                   <div>
                     <FieldLabel>Password</FieldLabel>
-                    <TextField
+                    <PasswordField
                       autoComplete="current-password"
-                      onChange={(event) => setLoginPassword(event.target.value)}
+                      onChange={setLoginPassword}
+                      onToggleVisibility={() => setLoginPasswordVisible((current) => !current)}
                       placeholder="Enter password"
-                      type="password"
                       value={loginPassword}
+                      visible={loginPasswordVisible}
                     />
                   </div>
                   <Button className="w-full" disabled={loading || !loginEmail.trim() || !loginPassword.trim()} type="submit">
@@ -189,11 +196,13 @@ export function AuthScreen({
                   onSubmit={(event) => {
                     event.preventDefault();
                     if (!inviteToken) return;
+                    if (!registerPasswordsMatch) return;
 
                     void onRegister({
                       token: inviteToken,
                       name: registerName,
-                      password: registerPassword
+                      password: registerPassword,
+                      passwordConfirmation: registerPasswordConfirmation
                     });
                   }}
                 >
@@ -231,18 +240,43 @@ export function AuthScreen({
                   </div>
                   <div>
                     <FieldLabel>Create password</FieldLabel>
-                    <TextField
+                    <PasswordField
                       autoComplete="new-password"
-                      onChange={(event) => setRegisterPassword(event.target.value)}
+                      onChange={setRegisterPassword}
+                      onToggleVisibility={() => setRegisterPasswordVisible((current) => !current)}
                       placeholder="At least 10 characters"
-                      type="password"
                       value={registerPassword}
+                      visible={registerPasswordVisible}
                     />
                     <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
                       Use at least 10 characters and include an uppercase letter, lowercase letter, number, and symbol.
                     </p>
                   </div>
-                  <Button className="w-full" disabled={loading || !inviteReady || !registerName.trim() || !registerPassword.trim()} type="submit">
+                  <div>
+                    <FieldLabel>Confirm password</FieldLabel>
+                    <PasswordField
+                      autoComplete="new-password"
+                      onChange={setRegisterPasswordConfirmation}
+                      onToggleVisibility={() => setRegisterPasswordConfirmationVisible((current) => !current)}
+                      placeholder="Re-enter password"
+                      value={registerPasswordConfirmation}
+                      visible={registerPasswordConfirmationVisible}
+                    />
+                    {showRegisterPasswordMismatch ? (
+                      <p className="mt-2 text-xs leading-5 text-rose-600 dark:text-rose-300">
+                        Password and confirmation do not match yet.
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                        Re-enter the same password so the client can confirm it before account creation.
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    className="w-full"
+                    disabled={loading || !inviteReady || !registerName.trim() || !registerPassword.trim() || !registerPasswordConfirmation.trim() || !registerPasswordsMatch}
+                    type="submit"
+                  >
                     Activate access
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
@@ -298,6 +332,43 @@ function CompactAccessChip({
     <div className="flex shrink-0 items-center gap-2 rounded-full border border-slate-200/80 bg-white/76 px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-950/46 dark:text-slate-200">
       <span className="text-accent-700 dark:text-lime-300">{icon}</span>
       <span>{label}</span>
+    </div>
+  );
+}
+
+function PasswordField({
+  value,
+  onChange,
+  placeholder,
+  autoComplete,
+  visible,
+  onToggleVisibility
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  autoComplete?: string;
+  visible: boolean;
+  onToggleVisibility: () => void;
+}) {
+  return (
+    <div className="relative">
+      <TextField
+        autoComplete={autoComplete}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        type={visible ? "text" : "password"}
+        value={value}
+        className="pr-12"
+      />
+      <button
+        aria-label={visible ? "Hide password" : "Show password"}
+        className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-slate-400 transition hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-200"
+        onClick={onToggleVisibility}
+        type="button"
+      >
+        {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
     </div>
   );
 }

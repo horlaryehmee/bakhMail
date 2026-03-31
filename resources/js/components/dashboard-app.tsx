@@ -1924,11 +1924,19 @@ export function DashboardApp() {
     }
   }
 
-  async function handleRegister(payload: { token: string; name: string; password: string }) {
+  async function handleRegister(payload: { token: string; name: string; password: string; passwordConfirmation: string }) {
     setWorking(true);
     setError(null);
     try {
-      const response = await apiRequest<Session>("/auth/register-invite", { method: "POST", body: payload });
+      const response = await apiRequest<Session>("/auth/register-invite", {
+        method: "POST",
+        body: {
+          token: payload.token,
+          name: payload.name,
+          password: payload.password,
+          password_confirmation: payload.passwordConfirmation
+        }
+      });
       persistSession(response);
       await refreshWorkspace(response.token, true);
       pushToast("Invite accepted", "Your account is ready.");
