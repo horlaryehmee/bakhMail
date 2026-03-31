@@ -126,8 +126,8 @@ return new class extends Migration
             $table->string('role', 32);
             $table->string('token', 80)->unique();
             $table->foreignId('invited_by_id')->constrained('users')->restrictOnDelete();
-            $table->timestamp('accepted_at')->nullable();
-            $table->timestamp('expires_at');
+            $table->dateTime('accepted_at')->nullable();
+            $table->dateTime('expires_at');
             $table->boolean('demo_data')->default(false);
             $table->timestamps();
         });

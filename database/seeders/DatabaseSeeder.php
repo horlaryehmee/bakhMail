@@ -8,7 +8,6 @@ use App\Support\WorkspaceDemoData;
 use App\Support\WorkspacePresenter;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -23,7 +22,7 @@ class DatabaseSeeder extends Seeder
             'email' => 'admin@bakhtech.com',
         ], [
             'name' => 'Bakare Olayemi',
-            'password' => Hash::make('BakhtechAdmin123!'),
+            'password' => 'BakhtechAdmin123!',
             'role' => 'master_admin',
             'title' => 'Master Admin',
             'notification_preferences' => WorkspacePresenter::defaultNotificationPreferences(),

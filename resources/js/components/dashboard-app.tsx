@@ -92,6 +92,30 @@ const defaultBranding: BrandingSettings = {
 };
 const voiceNoteMimeTypeOptions = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus", "audio/ogg", "audio/mpeg"];
 
+function resolveInitialTheme(): "light" | "dark" {
+  if (typeof window === "undefined") {
+    return "light";
+  }
+
+  const storedTheme = window.localStorage.getItem("bakhtech.theme");
+
+  if (storedTheme === "dark" || storedTheme === "light") {
+    return storedTheme;
+  }
+
+  return "light";
+}
+
+function applyThemeToDocument(theme: "light" | "dark") {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  document.documentElement.classList.toggle("dark", theme === "dark");
+  document.documentElement.style.colorScheme = "light";
+  document.documentElement.dataset.theme = theme;
+}
+
 function useInviteToken() {
   const [inviteToken, setInviteToken] = useState<string | null>(null);
 
@@ -1281,7 +1305,7 @@ const notificationPreferenceOptions: Array<{
 export function DashboardApp() {
   const inviteToken = useInviteToken();
 
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<"light" | "dark">(() => resolveInitialTheme());
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1470,10 +1494,9 @@ export function DashboardApp() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const storedTheme = window.localStorage.getItem("bakhtech.theme");
-    const nextTheme = storedTheme === "dark" ? "dark" : "light";
+    const nextTheme = resolveInitialTheme();
     setTheme(nextTheme);
-    document.documentElement.classList.toggle("dark", nextTheme === "dark");
+    applyThemeToDocument(nextTheme);
     void fetchBranding();
 
     const storedSession = window.localStorage.getItem("bakhtech.session");
@@ -1487,7 +1510,7 @@ export function DashboardApp() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    document.documentElement.classList.toggle("dark", theme === "dark");
+    applyThemeToDocument(theme);
     window.localStorage.setItem("bakhtech.theme", theme);
   }, [theme]);
 
@@ -3350,7 +3373,7 @@ export function DashboardApp() {
   }
 
   return (
-    <main className="min-h-screen px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4 md:px-6 md:py-6 lg:pb-6">
+      <main className="min-h-screen min-h-dvh px-4 pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-4 md:px-6 md:py-6 lg:pb-6">
       <ToastViewport toasts={toasts} />
       <div className="mx-auto max-w-[1600px] gap-6 xl:grid xl:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="mb-6 hidden xl:block xl:mb-0">
@@ -5688,7 +5711,7 @@ export function DashboardApp() {
         </div>
       </Modal>
 
-      <nav className="fixed inset-x-0 bottom-4 z-[70] flex justify-center px-3 xl:hidden">
+      <nav className="mobile-dock-shell xl:hidden">
         <div className="pointer-events-auto flex w-full max-w-[420px] items-center justify-between gap-1 rounded-[28px] border border-white/75 bg-white/82 p-1.5 shadow-[0_20px_44px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-slate-700/75 dark:bg-slate-950/84">
           {workspaceNavItems.map((item) => (
             <MobileDockButton

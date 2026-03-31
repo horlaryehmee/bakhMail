@@ -121,7 +121,7 @@ export function TextField(props: React.InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...props}
       className={cn(
-        "w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-900 outline-none ring-0 transition placeholder:text-slate-400 focus:border-accent-400 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100",
+        "block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-900 outline-none ring-0 transition placeholder:text-slate-400 focus:border-accent-400 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100",
         props.className
       )}
     />
@@ -133,7 +133,7 @@ export function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
     <textarea
       {...props}
       className={cn(
-        "w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-accent-400 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100",
+        "block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-accent-400 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100",
         props.className
       )}
     />
@@ -145,7 +145,7 @@ export function SelectField(props: React.SelectHTMLAttributes<HTMLSelectElement>
     <select
       {...props}
       className={cn(
-        "w-full appearance-none rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-accent-400 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100 dark:[color-scheme:dark]",
+        "block w-full min-w-0 max-w-full appearance-none rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-accent-400 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100 dark:[color-scheme:dark]",
         props.className
       )}
     />
@@ -205,7 +205,7 @@ export function Modal({
                 <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
-            <div className="scrollbar-thin min-h-0 overflow-y-auto pr-1">
+            <div className="scrollbar-thin min-h-0 overflow-x-hidden overflow-y-auto pr-1">
               {children}
             </div>
           </motion.div>

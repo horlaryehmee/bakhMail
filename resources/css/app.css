@@ -69,7 +69,7 @@
     --color-slate-400: #93a2b8;
     --color-slate-300: #aeb8c9;
     --color-slate-200: #d7deea;
-    color-scheme: dark;
+    color-scheme: light;
 }
 
 * {
@@ -82,8 +82,20 @@ body,
     min-height: 100%;
 }
 
+html {
+    min-height: 100dvh;
+    background: #eef4f7;
+    color-scheme: light;
+}
+
+html.dark {
+    background: #09121f;
+    color-scheme: light;
+}
+
 body {
     margin: 0;
+    min-height: 100dvh;
     background:
         var(--glow),
         radial-gradient(circle at top right, rgba(249, 115, 22, 0.12), transparent 30%),
@@ -112,6 +124,28 @@ input,
 select,
 textarea {
     font: inherit;
+    min-width: 0;
+    max-width: 100%;
+}
+
+input[type='date'],
+input[type='datetime-local'],
+input[type='time'],
+input[type='month'] {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+
+input[type='date']::-webkit-date-and-time-value,
+input[type='datetime-local']::-webkit-date-and-time-value,
+input[type='time']::-webkit-date-and-time-value,
+input[type='month']::-webkit-date-and-time-value {
+    text-align: left;
+}
+
+input[type='file'] {
+    overflow: hidden;
 }
 
 .dark select {
@@ -188,6 +222,34 @@ textarea {
 
 .dark .scrollbar-thin::-webkit-scrollbar-thumb {
     background: rgba(148, 163, 184, 0.22);
+}
+
+.mobile-dock-shell {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    z-index: 70;
+    display: flex;
+    justify-content: center;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
+    pointer-events: none;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
+.mobile-dock-shell > * {
+    pointer-events: auto;
+}
+
+@supports (-webkit-touch-callout: none) {
+    .mobile-dock-shell {
+        bottom: calc(env(safe-area-inset-bottom) + 0.4rem);
+        padding-bottom: env(safe-area-inset-bottom);
+        will-change: transform;
+    }
 }
 
 /* Full dark-mode restyle for the existing workspace utilities */

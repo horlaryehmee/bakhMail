@@ -151,7 +151,7 @@ class InstallationService
             'email' => strtolower($payload['admin_email']),
         ], [
             'name' => $payload['admin_name'],
-            'password' => Hash::make($payload['admin_password']),
+            'password' => $payload['admin_password'],
             'role' => 'master_admin',
             'title' => 'Master Admin',
             'notification_preferences' => WorkspacePresenter::defaultNotificationPreferences(),
@@ -159,6 +159,14 @@ class InstallationService
             'demo_data' => false,
             'api_token' => Str::random(80),
         ]);
+
+        $admin = User::query()->where('email', strtolower($payload['admin_email']))->first();
+
+        if (! $admin || ! Hash::check($payload['admin_password'], (string) $admin->password)) {
+            throw ValidationException::withMessages([
+                'install' => 'The first Master Admin account could not be verified after installation. Please run the installer again.',
+            ]);
+        }
 
         BrandingSetting::query()->updateOrCreate([
             'key' => 'branding',
