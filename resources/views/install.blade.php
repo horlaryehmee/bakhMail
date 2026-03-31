@@ -312,8 +312,8 @@
                             <p class="section-label">Email Notifications</p>
                             <div class="grid">
                                 <div>
-                                    <label for="mail_scheme">Mail encryption</label>
-                                    <input id="mail_scheme" name="mail_scheme" value="{{ $defaults['mail_scheme'] }}" placeholder="tls">
+                                    <label for="mail_scheme">SMTP scheme</label>
+                                    <input id="mail_scheme" name="mail_scheme" value="{{ $defaults['mail_scheme'] }}" placeholder="smtp">
                                 </div>
                                 <div>
                                     <label for="mail_port">SMTP port</label>
@@ -343,7 +343,7 @@
                         </div>
 
                         <div class="actions">
-                            <span class="meta">The database must already exist. SMTP details are optional during install, but required if you want real email notifications instead of logged mail.</span>
+                            <span class="meta">The database must already exist. SMTP details are optional during install, but required if you want real email notifications instead of logged mail. Use <strong>smtp</strong> for port 587 and <strong>smtps</strong> for port 465.</span>
                             <button class="button" type="submit">Install TaskManager</button>
                         </div>
                     </form>

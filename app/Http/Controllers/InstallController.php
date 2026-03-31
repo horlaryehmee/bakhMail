@@ -26,7 +26,7 @@ class InstallController extends Controller
                 'db_port' => old('db_port', '3306'),
                 'db_name' => old('db_name', ''),
                 'db_user' => old('db_user', ''),
-                'mail_scheme' => old('mail_scheme', 'tls'),
+                'mail_scheme' => old('mail_scheme', 'smtp'),
                 'mail_host' => old('mail_host', ''),
                 'mail_port' => old('mail_port', '587'),
                 'mail_user' => old('mail_user', ''),

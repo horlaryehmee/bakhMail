@@ -33,6 +33,11 @@ class InstallationService
         $this->assertDatabaseConnection($payload);
 
         $appKey = 'base64:'.base64_encode(random_bytes(32));
+        $mailScheme = $this->normalizeMailScheme(
+            $payload['mail_scheme'] ?? null,
+            $payload['mail_port'] ?? null,
+            $payload['mail_host'] ?? null,
+        );
 
         $envValues = [
             'APP_NAME' => $payload['app_name'],
@@ -51,7 +56,7 @@ class InstallationService
             'CACHE_STORE' => 'file',
             'QUEUE_CONNECTION' => 'sync',
             'MAIL_MAILER' => filled($payload['mail_host'] ?? null) ? 'smtp' : 'log',
-            'MAIL_SCHEME' => $payload['mail_scheme'] ?: null,
+            'MAIL_SCHEME' => $mailScheme,
             'MAIL_HOST' => $payload['mail_host'] ?: null,
             'MAIL_PORT' => filled($payload['mail_port'] ?? null) ? (string) $payload['mail_port'] : null,
             'MAIL_USERNAME' => $payload['mail_user'] ?: null,
@@ -151,6 +156,24 @@ class InstallationService
         Config::set('mail.mailers.smtp.password', $envValues['MAIL_PASSWORD']);
         Config::set('mail.from.address', $envValues['MAIL_FROM_ADDRESS']);
         Config::set('mail.from.name', $envValues['MAIL_FROM_NAME']);
+    }
+
+    private function normalizeMailScheme(mixed $scheme, mixed $port, mixed $host): ?string
+    {
+        if (! filled($host)) {
+            return null;
+        }
+
+        $normalized = strtolower(trim((string) $scheme));
+        $normalizedPort = (string) $port;
+
+        return match ($normalized) {
+            '', 'auto' => $normalizedPort === '465' ? 'smtps' : 'smtp',
+            'tls' => 'smtp',
+            'ssl' => 'smtps',
+            'smtp', 'smtps' => $normalized,
+            default => $normalized,
+        };
     }
 
     private function createInitialRecords(array $payload): void
