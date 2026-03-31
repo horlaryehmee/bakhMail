@@ -1,0 +1,80 @@
+{
+  "_mail-CQqH2WXY.js": {
+    "file": "assets/mail-CQqH2WXY.js",
+    "name": "mail",
+    "imports": [
+      "_ui-6BF9Fcdr.js"
+    ]
+  },
+  "_ui-6BF9Fcdr.js": {
+    "file": "assets/ui-6BF9Fcdr.js",
+    "name": "ui",
+    "imports": [
+      "resources/js/app.jsx"
+    ]
+  },
+  "_users-BO37tUww.js": {
+    "file": "assets/users-BO37tUww.js",
+    "name": "users",
+    "imports": [
+      "_ui-6BF9Fcdr.js"
+    ]
+  },
+  "resources/css/app.css": {
+    "file": "assets/app-C_kSSQlo.css",
+    "name": "app",
+    "names": [
+      "app.css"
+    ],
+    "src": "resources/css/app.css",
+    "isEntry": true
+  },
+  "resources/js/Pages/Auth.jsx": {
+    "file": "assets/Auth-ozNDjbXf.js",
+    "name": "Auth",
+    "src": "resources/js/Pages/Auth.jsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.jsx",
+      "_ui-6BF9Fcdr.js",
+      "_mail-CQqH2WXY.js"
+    ]
+  },
+  "resources/js/Pages/Dashboard.jsx": {
+    "file": "assets/Dashboard-KjFlTeeK.js",
+    "name": "Dashboard",
+    "src": "resources/js/Pages/Dashboard.jsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.jsx",
+      "_ui-6BF9Fcdr.js",
+      "_users-BO37tUww.js"
+    ]
+  },
+  "resources/js/Pages/Workspace.tsx": {
+    "file": "assets/Workspace-CTdcy-8r.js",
+    "name": "Workspace",
+    "src": "resources/js/Pages/Workspace.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.jsx",
+      "_ui-6BF9Fcdr.js",
+      "_mail-CQqH2WXY.js",
+      "_users-BO37tUww.js"
+    ]
+  },
+  "resources/js/app.jsx": {
+    "file": "assets/app-1cH9yKOD.js",
+    "name": "app",
+    "src": "resources/js/app.jsx",
+    "isEntry": true,
+    "dynamicImports": [
+      "resources/js/Pages/Auth.jsx",
+      "resources/js/Pages/Dashboard.jsx",
+      "resources/js/Pages/Workspace.tsx"
+    ],
+    "css": [
+      "assets/app-C_kSSQlo.css"
+    ]
+  }
+}
