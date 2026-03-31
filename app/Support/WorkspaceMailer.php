@@ -17,6 +17,19 @@ use Throwable;
 
 class WorkspaceMailer
 {
+    public function currentMailConfiguration(): array
+    {
+        return [
+            'mailer' => (string) config('mail.default', 'log'),
+            'scheme' => (string) config('mail.mailers.smtp.scheme', ''),
+            'host' => (string) config('mail.mailers.smtp.host', ''),
+            'port' => (string) config('mail.mailers.smtp.port', ''),
+            'username' => (string) config('mail.mailers.smtp.username', ''),
+            'fromAddress' => (string) config('mail.from.address', ''),
+            'fromName' => (string) config('mail.from.name', ''),
+        ];
+    }
+
     public function sendInvite(Invite $invite, ?User $invitedBy = null): void
     {
         $branding = $this->branding();
@@ -43,6 +56,30 @@ class WorkspaceMailer
                 'footer' => 'If you were not expecting this invite, you can safely ignore this email.',
             ]
         );
+    }
+
+    public function sendTestMessage(string $email): void
+    {
+        $branding = $this->branding();
+
+        Mail::to($email)->send(new WorkspaceMessageMail(
+            branding: $branding,
+            messageData: [
+                'subject' => "{$branding['brandName']} email test",
+                'eyebrow' => 'Email test',
+                'headline' => 'SMTP delivery is connected',
+                'intro' => 'This is a live test from your workspace email configuration.',
+                'body' => 'If you received this message, branded emails from invites, comments, requests, task updates, and activity notifications can be delivered from this server.',
+                'actionLabel' => 'Open workspace',
+                'actionUrl' => $branding['appUrl'],
+                'details' => [
+                    ['label' => 'Mailer', 'value' => (string) config('mail.default', 'log')],
+                    ['label' => 'Host', 'value' => (string) config('mail.mailers.smtp.host', 'not configured')],
+                    ['label' => 'Sent at', 'value' => now()->format('M j, Y g:i A')],
+                ],
+                'footer' => 'You can ignore this message after confirming delivery.',
+            ],
+        ));
     }
 
     public function sendNotificationByIds(array|Collection $recipientIds, string $preferenceKey, array $payload, ?int $excludeUserId = null): void
