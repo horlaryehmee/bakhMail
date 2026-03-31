@@ -50,8 +50,14 @@ class InstallationService
             'SESSION_DRIVER' => 'file',
             'CACHE_STORE' => 'file',
             'QUEUE_CONNECTION' => 'sync',
-            'MAIL_MAILER' => 'log',
-            'MAIL_FROM_NAME' => $payload['app_name'],
+            'MAIL_MAILER' => filled($payload['mail_host'] ?? null) ? 'smtp' : 'log',
+            'MAIL_SCHEME' => $payload['mail_scheme'] ?: null,
+            'MAIL_HOST' => $payload['mail_host'] ?: null,
+            'MAIL_PORT' => filled($payload['mail_port'] ?? null) ? (string) $payload['mail_port'] : null,
+            'MAIL_USERNAME' => $payload['mail_user'] ?: null,
+            'MAIL_PASSWORD' => $payload['mail_password'] ?: null,
+            'MAIL_FROM_ADDRESS' => $payload['mail_from_address'] ?: strtolower($payload['admin_email']),
+            'MAIL_FROM_NAME' => $payload['mail_from_name'] ?: $payload['app_name'],
             'VITE_API_URL' => '/api',
         ];
 
@@ -137,6 +143,14 @@ class InstallationService
         Config::set('database.connections.mysql.database', $envValues['DB_DATABASE']);
         Config::set('database.connections.mysql.username', $envValues['DB_USERNAME']);
         Config::set('database.connections.mysql.password', $envValues['DB_PASSWORD']);
+        Config::set('mail.default', $envValues['MAIL_MAILER']);
+        Config::set('mail.mailers.smtp.scheme', $envValues['MAIL_SCHEME']);
+        Config::set('mail.mailers.smtp.host', $envValues['MAIL_HOST']);
+        Config::set('mail.mailers.smtp.port', $envValues['MAIL_PORT']);
+        Config::set('mail.mailers.smtp.username', $envValues['MAIL_USERNAME']);
+        Config::set('mail.mailers.smtp.password', $envValues['MAIL_PASSWORD']);
+        Config::set('mail.from.address', $envValues['MAIL_FROM_ADDRESS']);
+        Config::set('mail.from.name', $envValues['MAIL_FROM_NAME']);
     }
 
     private function createInitialRecords(array $payload): void

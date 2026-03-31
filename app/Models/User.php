@@ -109,8 +109,20 @@ class User extends Authenticatable
                     'comments' => true,
                     'requests' => true,
                     'deadlines' => true,
-                    'activity' => false,
+                    'activity' => true,
                 ],
         );
+    }
+
+    public function wantsEmailFor(string $channel): bool
+    {
+        $preferences = array_merge([
+            'comments' => true,
+            'requests' => true,
+            'deadlines' => true,
+            'activity' => true,
+        ], $this->notification_preferences ?? []);
+
+        return (bool) ($preferences[$channel] ?? false);
     }
 }

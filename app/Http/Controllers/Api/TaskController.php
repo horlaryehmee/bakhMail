@@ -68,8 +68,49 @@ class TaskController extends Controller
         $progress = WorkspaceActions::updateProjectProgress($project->id);
         WorkspaceActions::log($request->user()->getKey(), 'task.created', "{$request->user()->name} created task {$task->title}", 'task', $task->getKey(), $project->id, $task->id);
 
+        $activityRecipients = WorkspaceActions::collaboratorIds($project)
+            ->reject(fn ($id) => (string) $id === (string) $request->user()->getKey())
+            ->reject(fn ($id) => $task->assignee_id && (string) $id === (string) $task->assignee_id)
+            ->all();
+
+        WorkspaceActions::notify(
+            $activityRecipients,
+            'Task created',
+            "{$request->user()->name} created {$task->title} in {$project->name}.",
+            'task',
+            $task->getKey(),
+            $project->id,
+            [
+                'actorName' => $request->user()->name,
+                'projectName' => $project->name,
+                'taskTitle' => $task->title,
+                'priority' => str($task->priority)->replace('_', ' ')->title()->toString(),
+                'dueDate' => optional($task->due_date)?->format('M j, Y'),
+            ],
+            false,
+            'activity',
+            (int) $request->user()->getKey(),
+        );
+
         if ($task->assignee_id) {
-            WorkspaceActions::notify([$task->assignee_id], 'New task assigned', "{$task->title} was assigned to you.", 'task', $task->getKey(), $project->id, ['projectId' => $project->id]);
+            WorkspaceActions::notify(
+                [$task->assignee_id],
+                'New task assigned',
+                "{$task->title} was assigned to you.",
+                'task',
+                $task->getKey(),
+                $project->id,
+                [
+                    'actorName' => $request->user()->name,
+                    'projectName' => $project->name,
+                    'taskTitle' => $task->title,
+                    'priority' => str($task->priority)->replace('_', ' ')->title()->toString(),
+                    'dueDate' => optional($task->due_date)?->format('M j, Y'),
+                ],
+                false,
+                $task->due_date ? 'deadlines' : 'activity',
+                (int) $request->user()->getKey(),
+            );
         }
 
         return response()->json([
@@ -81,6 +122,9 @@ class TaskController extends Controller
     public function update(Request $request, Task $task): JsonResponse
     {
         $existing = WorkspaceAccess::taskOrFail($request->user(), $task->getKey());
+        $previousAssigneeId = $existing->assignee_id;
+        $previousStatus = $existing->status;
+        $previousDueDate = $existing->due_date?->copy();
         $payload = $this->validatePayload($request, true);
         $targetProjectId = array_key_exists('project', $payload) ? $payload['project'] : $existing->project_id;
 
@@ -114,6 +158,107 @@ class TaskController extends Controller
 
         WorkspaceActions::log($request->user()->getKey(), 'task.updated', "{$request->user()->name} updated task {$existing->title}", 'task', $existing->getKey(), (int) $targetProjectId, $existing->id);
 
+        $projectName = $existing->project?->name ?? 'Project workspace';
+        $activityRecipients = WorkspaceActions::collaboratorIds($existing->project)
+            ->reject(fn ($id) => (string) $id === (string) $request->user()->getKey())
+            ->reject(fn ($id) => $existing->assignee_id && (string) $id === (string) $existing->assignee_id)
+            ->all();
+
+        WorkspaceActions::notify(
+            $activityRecipients,
+            'Task updated',
+            "{$request->user()->name} updated {$existing->title}.",
+            'task',
+            $existing->getKey(),
+            (int) $targetProjectId,
+            [
+                'actorName' => $request->user()->name,
+                'projectName' => $projectName,
+                'taskTitle' => $existing->title,
+                'status' => str($existing->status)->replace('_', ' ')->title()->toString(),
+                'priority' => str($existing->priority)->replace('_', ' ')->title()->toString(),
+                'dueDate' => optional($existing->due_date)?->format('M j, Y'),
+            ],
+            false,
+            'activity',
+            (int) $request->user()->getKey(),
+        );
+
+        if ($existing->assignee_id && (string) $previousAssigneeId !== (string) $existing->assignee_id) {
+            WorkspaceActions::notify(
+                [$existing->assignee_id],
+                'Task assigned to you',
+                "{$existing->title} is now assigned to you.",
+                'task',
+                $existing->getKey(),
+                (int) $targetProjectId,
+                [
+                    'actorName' => $request->user()->name,
+                    'projectName' => $projectName,
+                    'taskTitle' => $existing->title,
+                    'priority' => str($existing->priority)->replace('_', ' ')->title()->toString(),
+                    'dueDate' => optional($existing->due_date)?->format('M j, Y'),
+                ],
+                false,
+                $existing->due_date ? 'deadlines' : 'activity',
+                (int) $request->user()->getKey(),
+            );
+        }
+
+        if ((string) optional($previousDueDate)?->toDateString() !== (string) optional($existing->due_date)?->toDateString() && $existing->due_date) {
+            $deadlineRecipients = collect([$existing->assignee_id, $existing->reporter_id])
+                ->filter()
+                ->reject(fn ($id) => (string) $id === (string) $request->user()->getKey())
+                ->unique()
+                ->values()
+                ->all();
+
+            WorkspaceActions::notify(
+                $deadlineRecipients,
+                'Task due date changed',
+                "{$existing->title} is now due on {$existing->due_date->format('M j, Y')}.",
+                'task',
+                $existing->getKey(),
+                (int) $targetProjectId,
+                [
+                    'actorName' => $request->user()->name,
+                    'projectName' => $projectName,
+                    'taskTitle' => $existing->title,
+                    'dueDate' => $existing->due_date->format('M j, Y'),
+                ],
+                false,
+                'deadlines',
+                (int) $request->user()->getKey(),
+            );
+        }
+
+        if ($previousStatus !== $existing->status) {
+            $statusRecipients = collect([$existing->assignee_id, $existing->reporter_id])
+                ->filter()
+                ->reject(fn ($id) => (string) $id === (string) $request->user()->getKey())
+                ->unique()
+                ->values()
+                ->all();
+
+            WorkspaceActions::notify(
+                $statusRecipients,
+                'Task status changed',
+                "{$existing->title} moved to " . str($existing->status)->replace('_', ' ')->title()->toString() . '.',
+                'task',
+                $existing->getKey(),
+                (int) $targetProjectId,
+                [
+                    'actorName' => $request->user()->name,
+                    'projectName' => $projectName,
+                    'taskTitle' => $existing->title,
+                    'status' => str($existing->status)->replace('_', ' ')->title()->toString(),
+                ],
+                false,
+                'activity',
+                (int) $request->user()->getKey(),
+            );
+        }
+
         return response()->json([
             'task' => WorkspacePresenter::task($existing),
             'progress' => $progress,
@@ -137,6 +282,35 @@ class TaskController extends Controller
         $progress = WorkspaceActions::updateProjectProgress((int) $existing->project_id);
         WorkspaceActions::log($request->user()->getKey(), 'task.status_changed', "{$request->user()->name} moved {$existing->title} to {$payload['status']}", 'task', $existing->getKey(), (int) $existing->project_id, $existing->id);
 
+        $statusRecipients = collect([
+            $existing->assignee_id,
+            $existing->reporter_id,
+            ...WorkspaceActions::collaboratorIds($existing->project)->all(),
+        ])
+            ->filter()
+            ->reject(fn ($id) => (string) $id === (string) $request->user()->getKey())
+            ->unique()
+            ->values()
+            ->all();
+
+        WorkspaceActions::notify(
+            $statusRecipients,
+            'Task status changed',
+            "{$existing->title} moved to " . str($payload['status'])->replace('_', ' ')->title()->toString() . '.',
+            'task',
+            $existing->getKey(),
+            (int) $existing->project_id,
+            [
+                'actorName' => $request->user()->name,
+                'projectName' => $existing->project?->name ?? 'Project workspace',
+                'taskTitle' => $existing->title,
+                'status' => str($payload['status'])->replace('_', ' ')->title()->toString(),
+            ],
+            false,
+            'activity',
+            (int) $request->user()->getKey(),
+        );
+
         return response()->json([
             'task' => WorkspacePresenter::task($existing),
             'progress' => $progress,
@@ -149,10 +323,37 @@ class TaskController extends Controller
         $projectId = (int) $existing->project_id;
         $title = $existing->title;
         $taskId = $existing->id;
+        $projectName = $existing->project?->name ?? 'Project workspace';
+        $recipients = collect([
+            $existing->assignee_id,
+            $existing->reporter_id,
+            ...WorkspaceActions::collaboratorIds($existing->project)->all(),
+        ])
+            ->filter()
+            ->reject(fn ($id) => (string) $id === (string) $request->user()->getKey())
+            ->unique()
+            ->values()
+            ->all();
         $existing->delete();
 
         WorkspaceActions::updateProjectProgress($projectId);
         WorkspaceActions::log($request->user()->getKey(), 'task.deleted', "{$request->user()->name} deleted task {$title}", 'task', $taskId, $projectId, $taskId);
+        WorkspaceActions::notify(
+            $recipients,
+            'Task removed',
+            "{$title} was removed from {$projectName}.",
+            'task',
+            $taskId,
+            $projectId,
+            [
+                'actorName' => $request->user()->name,
+                'projectName' => $projectName,
+                'taskTitle' => $title,
+            ],
+            false,
+            'activity',
+            (int) $request->user()->getKey(),
+        );
 
         return response()->json([], 204);
     }

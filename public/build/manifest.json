@@ -1,23 +1,23 @@
 {
-  "_mail-BVWmMDPr.js": {
-    "file": "assets/mail-BVWmMDPr.js",
+  "_mail-lA45i2IZ.js": {
+    "file": "assets/mail-lA45i2IZ.js",
     "name": "mail",
     "imports": [
-      "_ui-C_F7_6C_.js"
+      "_ui-DCSVnGD5.js"
     ]
   },
-  "_ui-C_F7_6C_.js": {
-    "file": "assets/ui-C_F7_6C_.js",
+  "_ui-DCSVnGD5.js": {
+    "file": "assets/ui-DCSVnGD5.js",
     "name": "ui",
     "imports": [
       "resources/js/app.jsx"
     ]
   },
-  "_users-DwMARY86.js": {
-    "file": "assets/users-DwMARY86.js",
+  "_users-BGI9SOKt.js": {
+    "file": "assets/users-BGI9SOKt.js",
     "name": "users",
     "imports": [
-      "_ui-C_F7_6C_.js"
+      "_ui-DCSVnGD5.js"
     ]
   },
   "resources/css/app.css": {
@@ -30,41 +30,41 @@
     "isEntry": true
   },
   "resources/js/Pages/Auth.jsx": {
-    "file": "assets/Auth-DjjB1yvs.js",
+    "file": "assets/Auth-Ac7OuHMy.js",
     "name": "Auth",
     "src": "resources/js/Pages/Auth.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "_ui-C_F7_6C_.js",
-      "_mail-BVWmMDPr.js"
+      "_ui-DCSVnGD5.js",
+      "_mail-lA45i2IZ.js"
     ]
   },
   "resources/js/Pages/Dashboard.jsx": {
-    "file": "assets/Dashboard-BlxV5yy3.js",
+    "file": "assets/Dashboard-DizgFHPW.js",
     "name": "Dashboard",
     "src": "resources/js/Pages/Dashboard.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "_ui-C_F7_6C_.js",
-      "_users-DwMARY86.js"
+      "_ui-DCSVnGD5.js",
+      "_users-BGI9SOKt.js"
     ]
   },
   "resources/js/Pages/Workspace.tsx": {
-    "file": "assets/Workspace-KiNW44uv.js",
+    "file": "assets/Workspace-cP3dzHiR.js",
     "name": "Workspace",
     "src": "resources/js/Pages/Workspace.tsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "_ui-C_F7_6C_.js",
-      "_mail-BVWmMDPr.js",
-      "_users-DwMARY86.js"
+      "_ui-DCSVnGD5.js",
+      "_mail-lA45i2IZ.js",
+      "_users-BGI9SOKt.js"
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-Ce6SpdcS.js",
+    "file": "assets/app-CSzg_T3K.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,

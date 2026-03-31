@@ -73,6 +73,29 @@ class RequestController extends Controller
             $requestItem->task_id
         );
 
+        $requestRecipients = WorkspaceActions::collaboratorIds($project)
+            ->reject(fn ($id) => (string) $id === (string) $request->user()->getKey())
+            ->all();
+
+        WorkspaceActions::notify(
+            $requestRecipients,
+            'New request submitted',
+            "{$requestItem->title} was submitted in {$project->name}.",
+            'request',
+            $requestItem->getKey(),
+            $project->id,
+            [
+                'actorName' => $request->user()->name,
+                'projectName' => $project->name,
+                'requestTitle' => $requestItem->title,
+                'priority' => str($requestItem->priority)->replace('_', ' ')->title()->toString(),
+                'status' => str($requestItem->status)->replace('_', ' ')->title()->toString(),
+            ],
+            false,
+            'requests',
+            (int) $request->user()->getKey(),
+        );
+
         return response()->json([
             'request' => WorkspacePresenter::request($requestItem),
         ], 201);
@@ -126,14 +149,30 @@ class RequestController extends Controller
             $existing->task_id
         );
 
+        $requestRecipients = WorkspaceActions::collaboratorIds($existing->project)
+            ->merge([$existing->created_by_id])
+            ->reject(fn ($id) => (string) $id === (string) $request->user()->getKey())
+            ->unique()
+            ->values()
+            ->all();
+
         WorkspaceActions::notify(
-            [$existing->created_by_id],
+            $requestRecipients,
             'Request updated',
             "{$existing->title} changed status to {$existing->status}.",
             'request',
             $existing->getKey(),
             $existing->project_id,
-            ['projectId' => $existing->project_id]
+            [
+                'actorName' => $request->user()->name,
+                'projectName' => $existing->project?->name ?? 'Project workspace',
+                'requestTitle' => $existing->title,
+                'priority' => str($existing->priority)->replace('_', ' ')->title()->toString(),
+                'status' => str($existing->status)->replace('_', ' ')->title()->toString(),
+            ],
+            false,
+            'requests',
+            (int) $request->user()->getKey(),
         );
 
         return response()->json([
@@ -145,10 +184,19 @@ class RequestController extends Controller
     {
         $existing = WorkspaceRequest::query()->findOrFail($workspaceRequest->getKey());
         WorkspaceAccess::projectOrFail($request->user(), $existing->project_id);
+        $existing->load('project');
 
         $projectId = $existing->project_id;
         $taskId = $existing->task_id;
         $requestId = $existing->id;
+        $title = $existing->title;
+        $projectName = $existing->project?->name ?? 'Project workspace';
+        $recipients = WorkspaceActions::collaboratorIds($existing->project)
+            ->merge([$existing->created_by_id])
+            ->reject(fn ($id) => (string) $id === (string) $request->user()->getKey())
+            ->unique()
+            ->values()
+            ->all();
         $existing->delete();
 
         WorkspaceActions::log(
@@ -159,6 +207,22 @@ class RequestController extends Controller
             $requestId,
             $projectId,
             $taskId
+        );
+        WorkspaceActions::notify(
+            $recipients,
+            'Request removed',
+            "{$title} was removed from {$projectName}.",
+            'request',
+            $requestId,
+            $projectId,
+            [
+                'actorName' => $request->user()->name,
+                'projectName' => $projectName,
+                'requestTitle' => $title,
+            ],
+            false,
+            'requests',
+            (int) $request->user()->getKey(),
         );
 
         return response()->json([], 204);

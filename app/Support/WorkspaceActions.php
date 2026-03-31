@@ -26,7 +26,18 @@ class WorkspaceActions
         ]);
     }
 
-    public static function notify(array $recipientIds, string $title, string $message, string $entityType, string|int $entityId, ?int $projectId = null, array $metadata = [], bool $demoData = false): void
+    public static function notify(
+        array $recipientIds,
+        string $title,
+        string $message,
+        string $entityType,
+        string|int $entityId,
+        ?int $projectId = null,
+        array $metadata = [],
+        bool $demoData = false,
+        string $preferenceKey = 'activity',
+        ?int $excludeUserId = null,
+    ): void
     {
         $unique = collect($recipientIds)->filter()->unique()->values();
 
@@ -49,6 +60,22 @@ class WorkspaceActions
         ])->all();
 
         WorkspaceNotification::query()->insert($records);
+
+        if (! $demoData) {
+            app(WorkspaceMailer::class)->sendNotificationByIds(
+                $unique->all(),
+                $preferenceKey,
+                [
+                    'title' => $title,
+                    'message' => $message,
+                    'entityType' => $entityType,
+                    'entityId' => (string) $entityId,
+                    'projectId' => $projectId,
+                    'metadata' => $metadata,
+                ],
+                $excludeUserId,
+            );
+        }
     }
 
     public static function updateProjectProgress(int $projectId): int

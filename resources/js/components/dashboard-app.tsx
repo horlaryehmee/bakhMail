@@ -83,7 +83,7 @@ const defaultNotificationPreferences: NotificationPreferences = {
   comments: true,
   requests: true,
   deadlines: true,
-  activity: false
+  activity: true
 };
 const defaultBranding: BrandingSettings = {
   brandName: "Bakhtech Solutions",
@@ -387,8 +387,10 @@ function ProjectPeoplePicker({
   inviteLabel,
   canInvite,
   onInvite,
+  onResend,
   pendingInvites,
-  lockedInviteMessage
+  lockedInviteMessage,
+  actionsDisabled
 }: {
   title: string;
   description: string;
@@ -405,8 +407,10 @@ function ProjectPeoplePicker({
   inviteLabel?: string;
   canInvite?: boolean;
   onInvite?: (email: string, role: UserRole) => void;
+  onResend?: (inviteId: string) => void;
   pendingInvites: GeneratedInviteState[];
   lockedInviteMessage?: string;
+  actionsDisabled?: boolean;
 }) {
   const normalizedSearch = searchValue.trim();
   const normalizedSearchEmail = normalizedSearch.toLowerCase();
@@ -529,12 +533,21 @@ function ProjectPeoplePicker({
                     Invite ready for {labelize(invite.role)}. They will appear in search after they register.
                   </p>
                 </div>
-                <Button
-                  onClick={() => void navigator.clipboard.writeText(invite.inviteLink).catch(() => undefined)}
-                  variant="secondary"
-                >
-                  Copy link
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  {onResend ? (
+                    <Button disabled={actionsDisabled} onClick={() => onResend(invite.id)} variant="ghost">
+                      <CornerDownLeft className="mr-2 h-4 w-4" />
+                      Resend
+                    </Button>
+                  ) : null}
+                  <Button
+                    disabled={actionsDisabled}
+                    onClick={() => void navigator.clipboard.writeText(invite.inviteLink).catch(() => undefined)}
+                    variant="secondary"
+                  >
+                    Copy link
+                  </Button>
+                </div>
               </div>
             </div>
           ))}
@@ -2124,6 +2137,42 @@ export function DashboardApp() {
       token: session.token,
       body: { email, role }
     });
+  }
+
+  async function resendInvite(inviteId: string) {
+    if (!session?.token) {
+      throw new Error("Authentication required");
+    }
+
+    return apiRequest<{ invite: PendingInvite }>(`/auth/invites/${inviteId}/resend`, {
+      method: "POST",
+      token: session.token
+    });
+  }
+
+  async function handleInviteResend(inviteId: string) {
+    setError(null);
+    setWorking(true);
+
+    try {
+      const response = await resendInvite(inviteId);
+      setPendingInvites((current) => [response.invite, ...current.filter((invite) => invite.id !== response.invite.id)]);
+      setProjectSetupInvites((current) => {
+        const match = current.find((invite) => invite.id === response.invite.id);
+
+        if (!match) {
+          return current;
+        }
+
+        return [response.invite, ...current.filter((invite) => invite.id !== response.invite.id)];
+      });
+      await navigator.clipboard.writeText(response.invite.inviteLink).catch(() => undefined);
+      pushToast("Invite resent", `${response.invite.email} received a fresh invite email. The new link was copied.`);
+      setWorking(false);
+    } catch (inviteError) {
+      setError(inviteError instanceof Error ? inviteError.message : "Unable to resend invite");
+      setWorking(false);
+    }
   }
 
   async function handleInviteSubmit() {
@@ -4977,13 +5026,25 @@ export function DashboardApp() {
                                     </span>
                                   ) : null}
                                 </div>
-                                <Button
-                                  className="w-full sm:w-auto"
-                                  onClick={() => void navigator.clipboard.writeText(invite.inviteLink).catch(() => undefined)}
-                                  variant="secondary"
-                                >
-                                  Copy link
-                                </Button>
+                                <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+                                  <Button
+                                    className="w-full sm:w-auto"
+                                    disabled={working}
+                                    onClick={() => void handleInviteResend(invite.id)}
+                                    variant="ghost"
+                                  >
+                                    <CornerDownLeft className="mr-2 h-4 w-4" />
+                                    Resend invite
+                                  </Button>
+                                  <Button
+                                    className="w-full sm:w-auto"
+                                    disabled={working}
+                                    onClick={() => void navigator.clipboard.writeText(invite.inviteLink).catch(() => undefined)}
+                                    variant="secondary"
+                                  >
+                                    Copy link
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           ))
@@ -5445,9 +5506,11 @@ export function DashboardApp() {
               inviteRole="admin"
               lockedInviteMessage="Only Master Admin can create new internal accounts. Existing admins can still be searched and added here."
               onInvite={(email, role) => void handleProjectSetupInvite(email, role)}
+              onResend={(inviteId) => void handleInviteResend(inviteId)}
               onRemove={(userId) =>
                 setProjectForm((current) => ({ ...current, teamMembers: current.teamMembers.filter((id) => id !== userId) }))
               }
+              actionsDisabled={working}
               onSearchChange={setProjectTeamSearch}
               onSelect={(userId) =>
                 setProjectForm((current) => ({ ...current, teamMembers: toggleSelection(current.teamMembers, userId) }))
@@ -5467,9 +5530,11 @@ export function DashboardApp() {
               inviteLabel="client"
               inviteRole="client"
               onInvite={(email, role) => void handleProjectSetupInvite(email, role)}
+              onResend={(inviteId) => void handleInviteResend(inviteId)}
               onRemove={(userId) =>
                 setProjectForm((current) => ({ ...current, clients: current.clients.filter((id) => id !== userId) }))
               }
+              actionsDisabled={working}
               onSearchChange={setProjectClientSearch}
               onSelect={(userId) =>
                 setProjectForm((current) => ({ ...current, clients: toggleSelection(current.clients, userId) }))

@@ -21,7 +21,7 @@ class WorkspacePresenter
             'comments' => true,
             'requests' => true,
             'deadlines' => true,
-            'activity' => false,
+            'activity' => true,
         ];
     }
 

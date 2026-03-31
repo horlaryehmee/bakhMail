@@ -100,7 +100,15 @@ class ProjectController extends Controller
             "You were added to {$project->name}.",
             'project',
             $project->getKey(),
-            $project->getKey()
+            $project->getKey(),
+            [
+                'actorName' => $request->user()->name,
+                'projectName' => $project->name,
+                'deadline' => optional($project->deadline)?->format('M j, Y'),
+            ],
+            false,
+            'activity',
+            (int) $request->user()->getKey(),
         );
 
         WorkspaceActions::log(
@@ -120,6 +128,7 @@ class ProjectController extends Controller
     public function update(Request $request, Project $project): JsonResponse
     {
         $project = WorkspaceAccess::projectOrFail($request->user(), $project->getKey());
+        $previousDeadline = $project->deadline?->copy();
         $payload = $this->validatePayload($request, true);
         $this->ensureUsersExist($payload['teamMembers'] ?? [], 'Internal team');
         $this->ensureUsersExist($payload['clients'] ?? [], 'Client accounts');
@@ -164,6 +173,48 @@ class ProjectController extends Controller
             $project->getKey()
         );
 
+        $activityRecipients = WorkspaceActions::collaboratorIds($project)
+            ->reject(fn ($id) => (string) $id === (string) $request->user()->getKey())
+            ->all();
+
+        WorkspaceActions::notify(
+            $activityRecipients,
+            'Project updated',
+            "{$request->user()->name} updated {$project->name}.",
+            'project',
+            $project->getKey(),
+            $project->getKey(),
+            [
+                'actorName' => $request->user()->name,
+                'projectName' => $project->name,
+                'status' => str($project->status)->replace('_', ' ')->title()->toString(),
+                'priority' => str($project->priority)->replace('_', ' ')->title()->toString(),
+                'deadline' => optional($project->deadline)?->format('M j, Y'),
+            ],
+            false,
+            'activity',
+            (int) $request->user()->getKey(),
+        );
+
+        if ((string) optional($previousDeadline)?->toDateString() !== (string) optional($project->deadline)?->toDateString() && $project->deadline) {
+            WorkspaceActions::notify(
+                $activityRecipients,
+                'Project deadline changed',
+                "{$project->name} now has a deadline of {$project->deadline->format('M j, Y')}.",
+                'project',
+                $project->getKey(),
+                $project->getKey(),
+                [
+                    'actorName' => $request->user()->name,
+                    'projectName' => $project->name,
+                    'deadline' => $project->deadline->format('M j, Y'),
+                ],
+                false,
+                'deadlines',
+                (int) $request->user()->getKey(),
+            );
+        }
+
         return response()->json([
             'project' => WorkspacePresenter::project($project, $project->tasks_count, $project->completed_tasks_count),
         ]);
@@ -174,9 +225,27 @@ class ProjectController extends Controller
         $project = WorkspaceAccess::projectOrFail($request->user(), $project->getKey());
         $projectId = $project->getKey();
         $name = $project->name;
+        $recipients = WorkspaceActions::collaboratorIds($project)
+            ->reject(fn ($id) => (string) $id === (string) $request->user()->getKey())
+            ->all();
 
         $project->delete();
         WorkspaceActions::log($request->user()->getKey(), 'project.deleted', "{$request->user()->name} deleted project {$name}", 'project', $projectId);
+        WorkspaceActions::notify(
+            $recipients,
+            'Project removed',
+            "{$name} was removed from the workspace.",
+            'project',
+            $projectId,
+            null,
+            [
+                'actorName' => $request->user()->name,
+                'projectName' => $name,
+            ],
+            false,
+            'activity',
+            (int) $request->user()->getKey(),
+        );
 
         return response()->json([], 204);
     }

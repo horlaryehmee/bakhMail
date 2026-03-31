@@ -9,6 +9,7 @@ use App\Support\WorkspaceActions;
 use App\Support\WorkspacePresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class CommentController extends Controller
@@ -99,21 +100,30 @@ class CommentController extends Controller
             $comment->task_id
         );
 
-        $replyRecipient = $replyTo && (string) $replyTo->author_id !== (string) $request->user()->getKey()
-            ? [$replyTo->author_id]
-            : [];
+        $recipients = WorkspaceActions::collaboratorIds($project)
+            ->merge($payload['mentions'] ?? [])
+            ->when($replyTo && (string) $replyTo->author_id !== (string) $request->user()->getKey(), fn ($collection) => $collection->push($replyTo->author_id))
+            ->reject(fn ($id) => (string) $id === (string) $request->user()->getKey())
+            ->unique()
+            ->values()
+            ->all();
 
         WorkspaceActions::notify(
-            array_values(array_unique([
-                ...($payload['mentions'] ?? []),
-                ...$replyRecipient,
-            ])),
+            $recipients,
             'New chat message',
             "{$request->user()->name} sent a message in the project chat.",
             'comment',
             $comment->getKey(),
             $project->id,
-            ['projectId' => $project->id]
+            [
+                'actorName' => $request->user()->name,
+                'projectName' => $project->name,
+                'taskTitle' => $task?->title ?? $replyTo?->task?->title,
+                'body' => Str::limit(trim((string) ($payload['content'] ?? '')), 220),
+            ],
+            false,
+            'comments',
+            (int) $request->user()->getKey(),
         );
 
         return response()->json([

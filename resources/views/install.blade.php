@@ -308,8 +308,42 @@
                             </div>
                         </div>
 
+                        <div class="section">
+                            <p class="section-label">Email Notifications</p>
+                            <div class="grid">
+                                <div>
+                                    <label for="mail_scheme">Mail encryption</label>
+                                    <input id="mail_scheme" name="mail_scheme" value="{{ $defaults['mail_scheme'] }}" placeholder="tls">
+                                </div>
+                                <div>
+                                    <label for="mail_port">SMTP port</label>
+                                    <input id="mail_port" name="mail_port" type="number" value="{{ $defaults['mail_port'] }}" placeholder="587">
+                                </div>
+                                <div class="full">
+                                    <label for="mail_host">SMTP host</label>
+                                    <input id="mail_host" name="mail_host" value="{{ $defaults['mail_host'] }}" placeholder="mail.example.com">
+                                </div>
+                                <div>
+                                    <label for="mail_user">SMTP username</label>
+                                    <input id="mail_user" name="mail_user" value="{{ $defaults['mail_user'] }}" placeholder="notifications@example.com">
+                                </div>
+                                <div>
+                                    <label for="mail_password">SMTP password</label>
+                                    <input id="mail_password" name="mail_password" type="password" autocomplete="new-password">
+                                </div>
+                                <div>
+                                    <label for="mail_from_address">From email</label>
+                                    <input id="mail_from_address" name="mail_from_address" type="email" value="{{ $defaults['mail_from_address'] }}" placeholder="notifications@example.com">
+                                </div>
+                                <div>
+                                    <label for="mail_from_name">From name</label>
+                                    <input id="mail_from_name" name="mail_from_name" value="{{ $defaults['mail_from_name'] }}" placeholder="TaskManager">
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="actions">
-                            <span class="meta">The database must already exist. The installer will create the tables and first account automatically.</span>
+                            <span class="meta">The database must already exist. SMTP details are optional during install, but required if you want real email notifications instead of logged mail.</span>
                             <button class="button" type="submit">Install TaskManager</button>
                         </div>
                     </form>
@@ -331,7 +365,8 @@
                             <div class="note">1. The installer verifies the database connection details you enter.</div>
                             <div class="note">2. It writes the Laravel environment file with your production database settings.</div>
                             <div class="note">3. It runs the database migrations and creates your first Master Admin account.</div>
-                            <div class="note">4. It locks the installer so the normal app opens on future visits.</div>
+                            <div class="note">4. If SMTP details are supplied, the app is ready to send branded invite and activity emails immediately.</div>
+                            <div class="note">5. It locks the installer so the normal app opens on future visits.</div>
                         </div>
                     </div>
                 </div>

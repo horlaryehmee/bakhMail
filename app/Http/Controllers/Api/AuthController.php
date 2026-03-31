@@ -7,6 +7,7 @@ use App\Models\Invite;
 use App\Models\User;
 use App\Support\WorkspaceAccess;
 use App\Support\WorkspaceAuth;
+use App\Support\WorkspaceMailer;
 use App\Support\WorkspacePresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -176,6 +177,20 @@ class AuthController extends Controller
             'password' => Hash::make($payload['newPassword']),
         ]);
 
+        app(WorkspaceMailer::class)->sendNotificationByIds(
+            [$user->getKey()],
+            'activity',
+            [
+                'title' => 'Password updated',
+                'message' => 'Your workspace password was changed successfully.',
+                'entityType' => 'account',
+                'entityId' => (string) $user->getKey(),
+                'metadata' => [
+                    'actorName' => $user->name,
+                ],
+            ]
+        );
+
         return response()->json([
             'token' => WorkspaceAuth::issueToken($user->fresh()),
             'user' => WorkspacePresenter::user($user->fresh()),
@@ -198,6 +213,20 @@ class AuthController extends Controller
         if ($currentUser && (string) $currentUser->getKey() === (string) $user->getKey()) {
             $response['token'] = WorkspaceAuth::issueToken($user->fresh());
         }
+
+        app(WorkspaceMailer::class)->sendNotificationByIds(
+            [$user->getKey()],
+            'activity',
+            [
+                'title' => 'Account password reset',
+                'message' => 'A workspace administrator reset your password.',
+                'entityType' => 'account',
+                'entityId' => (string) $user->getKey(),
+                'metadata' => [
+                    'actorName' => $request->user()?->name ?? 'Workspace administrator',
+                ],
+            ]
+        );
 
         return response()->json($response);
     }
@@ -257,9 +286,41 @@ class AuthController extends Controller
             'expires_at' => now()->addWeek(),
         ]);
 
+        app(WorkspaceMailer::class)->sendInvite($invite, $authUser);
+
         return response()->json([
             'invite' => WorkspacePresenter::invite($invite, config('app.url')),
         ], 201);
+    }
+
+    public function resendInvite(Request $request, Invite $invite): JsonResponse
+    {
+        /** @var User $authUser */
+        $authUser = $request->user();
+
+        if ($invite->accepted_at) {
+            return response()->json(['message' => 'This invite has already been accepted'], 409);
+        }
+
+        if ($authUser->role === 'admin' && $invite->role !== 'client') {
+            return response()->json(['message' => 'Admins can only resend client invites'], 403);
+        }
+
+        if (User::query()->where('email', $invite->email)->exists()) {
+            return response()->json(['message' => 'A user already exists with that email'], 409);
+        }
+
+        $invite->forceFill([
+            'token' => Str::random(48),
+            'invited_by_id' => $authUser->getKey(),
+            'expires_at' => now()->addWeek(),
+        ])->save();
+
+        app(WorkspaceMailer::class)->sendInvite($invite->fresh(), $authUser);
+
+        return response()->json([
+            'invite' => WorkspacePresenter::invite($invite->fresh(), config('app.url')),
+        ]);
     }
 
     public function registerInvite(Request $request): JsonResponse

@@ -24,6 +24,7 @@ Route::middleware('app.installed')->group(function (): void {
             Route::get('/users', [AuthController::class, 'users']);
             Route::get('/pending-invites', [AuthController::class, 'pendingInvites'])->middleware('workspace.role:master_admin,admin');
             Route::post('/invite', [AuthController::class, 'createInvite'])->middleware('workspace.role:master_admin,admin');
+            Route::post('/invites/{invite}/resend', [AuthController::class, 'resendInvite'])->middleware('workspace.role:master_admin,admin');
             Route::patch('/users/{user}', [AuthController::class, 'updateUser'])->middleware('workspace.role:master_admin');
             Route::patch('/users/{user}/password', [AuthController::class, 'resetUserPassword'])->middleware('workspace.role:master_admin');
         });
