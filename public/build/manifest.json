@@ -1,27 +1,27 @@
 {
-  "_mail-CQqH2WXY.js": {
-    "file": "assets/mail-CQqH2WXY.js",
+  "_mail-BVWmMDPr.js": {
+    "file": "assets/mail-BVWmMDPr.js",
     "name": "mail",
     "imports": [
-      "_ui-6BF9Fcdr.js"
+      "_ui-C_F7_6C_.js"
     ]
   },
-  "_ui-6BF9Fcdr.js": {
-    "file": "assets/ui-6BF9Fcdr.js",
+  "_ui-C_F7_6C_.js": {
+    "file": "assets/ui-C_F7_6C_.js",
     "name": "ui",
     "imports": [
       "resources/js/app.jsx"
     ]
   },
-  "_users-BO37tUww.js": {
-    "file": "assets/users-BO37tUww.js",
+  "_users-DwMARY86.js": {
+    "file": "assets/users-DwMARY86.js",
     "name": "users",
     "imports": [
-      "_ui-6BF9Fcdr.js"
+      "_ui-C_F7_6C_.js"
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-C_kSSQlo.css",
+    "file": "assets/app-D90DTYmu.css",
     "name": "app",
     "names": [
       "app.css"
@@ -30,41 +30,41 @@
     "isEntry": true
   },
   "resources/js/Pages/Auth.jsx": {
-    "file": "assets/Auth-ozNDjbXf.js",
+    "file": "assets/Auth-DjjB1yvs.js",
     "name": "Auth",
     "src": "resources/js/Pages/Auth.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "_ui-6BF9Fcdr.js",
-      "_mail-CQqH2WXY.js"
+      "_ui-C_F7_6C_.js",
+      "_mail-BVWmMDPr.js"
     ]
   },
   "resources/js/Pages/Dashboard.jsx": {
-    "file": "assets/Dashboard-KjFlTeeK.js",
+    "file": "assets/Dashboard-BlxV5yy3.js",
     "name": "Dashboard",
     "src": "resources/js/Pages/Dashboard.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "_ui-6BF9Fcdr.js",
-      "_users-BO37tUww.js"
+      "_ui-C_F7_6C_.js",
+      "_users-DwMARY86.js"
     ]
   },
   "resources/js/Pages/Workspace.tsx": {
-    "file": "assets/Workspace-CTdcy-8r.js",
+    "file": "assets/Workspace-KiNW44uv.js",
     "name": "Workspace",
     "src": "resources/js/Pages/Workspace.tsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "_ui-6BF9Fcdr.js",
-      "_mail-CQqH2WXY.js",
-      "_users-BO37tUww.js"
+      "_ui-C_F7_6C_.js",
+      "_mail-BVWmMDPr.js",
+      "_users-DwMARY86.js"
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-1cH9yKOD.js",
+    "file": "assets/app-Ce6SpdcS.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,
@@ -74,7 +74,7 @@
       "resources/js/Pages/Workspace.tsx"
     ],
     "css": [
-      "assets/app-C_kSSQlo.css"
+      "assets/app-D90DTYmu.css"
     ]
   }
 }

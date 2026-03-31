@@ -112,7 +112,7 @@ function applyThemeToDocument(theme: "light" | "dark") {
   }
 
   document.documentElement.classList.toggle("dark", theme === "dark");
-  document.documentElement.style.colorScheme = "light";
+  document.documentElement.style.colorScheme = "only light";
   document.documentElement.dataset.theme = theme;
 }
 
