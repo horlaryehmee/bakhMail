@@ -1,4 +1,13 @@
-{{ $messageData['headline'] ?? ($messageData['subject'] ?? ($branding['brandName'] ?? config('app.name', 'TaskManager'))) }}
+@php
+    $brandName = $branding['brandName'] ?? config('app.name', 'TaskManager');
+    $headline = $messageData['headline'] ?? ($messageData['subject'] ?? $brandName);
+    $subject = $messageData['subject'] ?? $headline;
+    $actionUrl = $messageData['actionUrl'] ?? ($branding['appUrl'] ?? config('app.url'));
+    $actionLabel = $messageData['actionLabel'] ?? 'Open workspace';
+@endphp
+{{ $subject }}
+
+{{ $headline }}
 
 @if(!empty($messageData['recipientName']))
 Hello {{ $messageData['recipientName'] }},
@@ -13,17 +22,22 @@ Hello {{ $messageData['recipientName'] }},
 
 @endif
 @if(!empty($messageData['details']))
+Workspace briefing
 @foreach($messageData['details'] as $detail)
-{{ $detail['label'] }}: {{ $detail['value'] }}
+- {{ $detail['label'] }}: {{ $detail['value'] }}
 @endforeach
 
 @endif
 @if(!empty($messageData['highlights']))
+Highlights
 @foreach($messageData['highlights'] as $highlight)
-- {{ $highlight['title'] }}@if(!empty($highlight['text'])) — {{ $highlight['text'] }}@endif
+- {{ $highlight['title'] }}@if(!empty($highlight['text'])) - {{ $highlight['text'] }}@endif
 @endforeach
 
 @endif
-{{ $messageData['actionLabel'] ?? 'Open workspace' }}: {{ $messageData['actionUrl'] ?? ($branding['appUrl'] ?? config('app.url')) }}
+{{ $actionLabel }}: {{ $actionUrl }}
 
 {{ $messageData['footer'] ?? 'You can manage your workspace from the dashboard at any time.' }}
+
+{{ $brandName }}
+{{ $branding['appUrl'] ?? config('app.url') }}

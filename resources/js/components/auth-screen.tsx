@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, Eye, EyeOff, FolderKanban, LockKeyhole, Mail, Me
 import { useEffect, useState } from "react";
 
 import type { BrandingSettings, UserRole } from "@/lib/types";
-import { labelize } from "@/lib/utils";
+import { cn, labelize } from "@/lib/utils";
 import { BrandMark } from "./brand-mark";
 import { Button, FieldLabel, TextField } from "./ui";
 
@@ -92,6 +92,7 @@ export function AuthScreen({
   const resetReady = Boolean(resetToken && resetEmail && resetStatus === "valid");
   const resetPasswordsMatch = resetPassword === resetPasswordConfirmation;
   const showResetPasswordMismatch = resetPasswordConfirmation.trim().length > 0 && !resetPasswordsMatch;
+  const isRecoveryMode = mode === "forgot" || mode === "reset";
 
   const heading = (() => {
     if (mode === "invite") return "Accept invite";
@@ -133,9 +134,15 @@ export function AuthScreen({
   })();
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.10),_transparent_32%),linear-gradient(180deg,_#f8fafc_0%,_#eef2f7_100%)] px-4 py-4 dark:bg-[radial-gradient(circle_at_top,_rgba(132,204,22,0.10),_transparent_30%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] sm:px-6">
-      <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-5xl items-center">
-        <div className="grid w-full gap-5 lg:grid-cols-[0.88fr_1.12fr]">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.10),_transparent_32%),linear-gradient(180deg,_#f8fafc_0%,_#eef2f7_100%)] px-4 py-6 dark:bg-[radial-gradient(circle_at_top,_rgba(132,204,22,0.10),_transparent_30%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] sm:px-6 sm:py-8">
+      <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full items-center justify-center">
+        <div
+          className={cn(
+            "grid w-full gap-5",
+            isRecoveryMode ? "max-w-[34rem]" : "max-w-[38rem]",
+            "lg:max-w-5xl lg:grid-cols-[0.88fr_1.12fr]"
+          )}
+        >
           <section className="surface relative hidden min-h-[640px] overflow-hidden rounded-[38px] p-8 lg:flex lg:flex-col lg:justify-between">
             <div className="absolute inset-x-0 top-0 h-36 bg-gradient-to-r from-accent-500/18 via-sky-500/10 to-emerald-500/14 blur-3xl" />
             <div className="absolute -bottom-20 -right-12 h-64 w-64 rounded-full bg-accent-500/10 blur-3xl dark:bg-lime-500/10" />
@@ -158,15 +165,15 @@ export function AuthScreen({
             </div>
           </section>
 
-          <section className="surface-strong rounded-[38px] p-6 sm:p-8">
-            <div className="flex items-start justify-between gap-4">
-              <div>
+          <section className={cn("surface-strong rounded-[34px] p-5 sm:p-8", isRecoveryMode && "mx-auto w-full max-w-[34rem]")}>
+            <div className={cn("flex items-start justify-between gap-4", isRecoveryMode && "flex-col items-center text-center sm:items-start sm:text-left")}>
+              <div className="min-w-0">
                 <BrandMark branding={branding} compact subtitle={subtitle} />
-                <h2 className="mt-3 font-display text-3xl leading-tight text-slate-900 dark:text-white sm:text-4xl">
+                <h2 className={cn("mt-3 font-display text-3xl leading-tight text-slate-900 dark:text-white sm:text-4xl", isRecoveryMode && "mx-auto max-w-[12ch]")}>
                   {heading}
                 </h2>
-                <p className="mt-2 hidden text-sm text-slate-500 dark:text-slate-400 sm:block">{helperCopy}</p>
-                <div className="scrollbar-thin -mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 lg:hidden">
+                <p className={cn("mt-2 text-sm text-slate-500 dark:text-slate-400", isRecoveryMode ? "block max-w-[34ch]" : "hidden sm:block")}>{helperCopy}</p>
+                <div className={cn("scrollbar-thin -mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 lg:hidden", isRecoveryMode && "hidden")}>
                   <CompactAccessChip icon={<FolderKanban className="h-3.5 w-3.5" />} label="Projects" />
                   <CompactAccessChip icon={<MessagesSquare className="h-3.5 w-3.5" />} label="Chat" />
                   <CompactAccessChip icon={<LockKeyhole className="h-3.5 w-3.5" />} label="Secure invite" />
@@ -177,11 +184,19 @@ export function AuthScreen({
                   Invite
                 </span>
               ) : mode === "forgot" || mode === "reset" ? (
-                <span className="rounded-full bg-accent-500/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-accent-700 dark:bg-lime-500/12 dark:text-lime-300">
+                <span className={cn("rounded-full bg-accent-500/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-accent-700 dark:bg-lime-500/12 dark:text-lime-300", isRecoveryMode && "mx-auto sm:mx-0")}>
                   Recovery
                 </span>
               ) : null}
             </div>
+
+            {isRecoveryMode ? (
+              <div className="mt-5 grid gap-2 sm:grid-cols-3">
+                <RecoveryChip label="Secure link" value="Single use" />
+                <RecoveryChip label="Fast expiry" value="Auto invalidates" />
+                <RecoveryChip label="Session safety" value="Old sign-ins cleared" />
+              </div>
+            ) : null}
 
             {showInviteTabs ? (
               <div className="mt-6 flex rounded-full border border-slate-200/80 bg-slate-100/70 p-1 dark:border-slate-800 dark:bg-slate-950/70">
@@ -228,7 +243,7 @@ export function AuthScreen({
               </div>
             ) : null}
 
-            <div className="mt-6 rounded-[30px] border border-slate-200/70 bg-white/76 p-5 shadow-[0_24px_80px_rgba(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-950/46 sm:p-6">
+            <div className={cn("mt-6 rounded-[30px] border border-slate-200/70 bg-white/76 p-5 shadow-[0_24px_80px_rgba(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-950/46 sm:p-6", isRecoveryMode && "mx-auto w-full max-w-[30rem]")}>
               {mode === "login" ? (
                 <form
                   className="space-y-4"
@@ -383,7 +398,7 @@ export function AuthScreen({
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                   <button
-                    className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                    className={cn("inline-flex items-center gap-2 text-sm font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200", isRecoveryMode && "w-full justify-center sm:w-auto sm:justify-start")}
                     onClick={() => {
                       setLocalNotice(null);
                       setMode("login");
@@ -458,7 +473,7 @@ export function AuthScreen({
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                   <button
-                    className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                    className={cn("inline-flex items-center gap-2 text-sm font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200", isRecoveryMode && "w-full justify-center sm:w-auto sm:justify-start")}
                     onClick={() => {
                       setLocalNotice(null);
                       setMode("forgot");
@@ -473,13 +488,13 @@ export function AuthScreen({
             </div>
 
             {localNotice ? (
-              <div className="mt-4 rounded-[24px] border border-sky-300/60 bg-sky-500/10 px-4 py-3 text-sm text-sky-700 dark:border-sky-400/30 dark:text-sky-300">
+              <div className={cn("mt-4 rounded-[24px] border border-sky-300/60 bg-sky-500/10 px-4 py-3 text-sm text-sky-700 dark:border-sky-400/30 dark:text-sky-300", isRecoveryMode && "mx-auto max-w-[30rem] text-center sm:text-left")}>
                 {localNotice}
               </div>
             ) : null}
 
             {error ? (
-              <div className="mt-4 rounded-[24px] border border-rose-300/60 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/25 dark:text-rose-300">
+              <div className={cn("mt-4 rounded-[24px] border border-rose-300/60 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/25 dark:text-rose-300", isRecoveryMode && "mx-auto max-w-[30rem] text-center sm:text-left")}>
                 {error}
               </div>
             ) : null}
@@ -545,6 +560,21 @@ function CompactAccessChip({
     <div className="flex shrink-0 items-center gap-2 rounded-full border border-slate-200/80 bg-white/76 px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-950/46 dark:text-slate-200">
       <span className="text-accent-700 dark:text-lime-300">{icon}</span>
       <span>{label}</span>
+    </div>
+  );
+}
+
+function RecoveryChip({
+  label,
+  value
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[20px] border border-slate-200/70 bg-white/72 px-4 py-3 text-center dark:border-slate-800 dark:bg-slate-950/42 sm:text-left">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400 dark:text-slate-500">{label}</div>
+      <div className="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">{value}</div>
     </div>
   );
 }
