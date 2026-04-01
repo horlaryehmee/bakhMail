@@ -205,7 +205,7 @@ class WorkspaceMailer
                                 $task->project?->name ? "Project: {$task->project->name}" : null,
                                 $task->due_date ? 'Due ' . $task->due_date->format('M j, Y') : null,
                                 $task->priority ? Str::of($task->priority)->replace('_', ' ')->title()->toString() . ' priority' : null,
-                            ])->filter()->implode(' · '),
+                            ])->filter()->implode(' | '),
                         ];
                     });
 
@@ -217,7 +217,7 @@ class WorkspaceMailer
                             'text' => collect([
                                 $project->deadline ? 'Deadline ' . $project->deadline->format('M j, Y') : null,
                                 $project->status ? Str::of($project->status)->replace('_', ' ')->title()->toString() : null,
-                            ])->filter()->implode(' · '),
+                            ])->filter()->implode(' | '),
                         ];
                     });
 
