@@ -116,8 +116,16 @@ function applyThemeToDocument(theme: "light" | "dark") {
   document.documentElement.dataset.theme = theme;
 }
 
-function useInviteToken() {
-  const [inviteToken, setInviteToken] = useState<string | null>(null);
+function useAuthEntryParams() {
+  const [paramsState, setParamsState] = useState<{
+    inviteToken: string | null;
+    resetToken: string | null;
+    resetEmail: string | null;
+  }>({
+    inviteToken: null,
+    resetToken: null,
+    resetEmail: null,
+  });
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -125,10 +133,14 @@ function useInviteToken() {
     }
 
     const params = new URLSearchParams(window.location.search);
-    setInviteToken(params.get("invite"));
+    setParamsState({
+      inviteToken: params.get("invite"),
+      resetToken: params.get("reset"),
+      resetEmail: params.get("email"),
+    });
   }, []);
 
-  return inviteToken;
+  return paramsState;
 }
 
 function WorkspaceNavButton({
@@ -1316,7 +1328,7 @@ const notificationPreferenceOptions: Array<{
 ];
 
 export function DashboardApp() {
-  const inviteToken = useInviteToken();
+  const { inviteToken, resetToken, resetEmail } = useAuthEntryParams();
 
   const [theme, setTheme] = useState<"light" | "dark">(() => resolveInitialTheme());
   const [loading, setLoading] = useState(true);
@@ -1325,6 +1337,7 @@ export function DashboardApp() {
   const [session, setSession] = useState<Session | null>(null);
   const [branding, setBranding] = useState<BrandingSettings>(defaultBranding);
   const [inviteInfo, setInviteInfo] = useState<{ email: string; role: UserRole; status: "pending" | "accepted" | "expired" } | null>(null);
+  const [resetInfo, setResetInfo] = useState<{ email: string; status: "valid" | "invalid" } | null>(null);
   const [demoDataStatus, setDemoDataStatus] = useState<DemoDataStatus | null>(null);
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -1539,6 +1552,19 @@ export function DashboardApp() {
       .then((response) => setInviteInfo(response.invite))
       .catch(() => setInviteInfo(null));
   }, [inviteToken, session?.token]);
+
+  useEffect(() => {
+    if (!resetToken || !resetEmail || session?.token) {
+      setResetInfo(null);
+      return;
+    }
+
+    void apiRequest<{ reset: { email: string; status: "valid" | "invalid" } }>(
+      `/auth/password-reset?token=${encodeURIComponent(resetToken)}&email=${encodeURIComponent(resetEmail)}`
+    )
+      .then((response) => setResetInfo(response.reset))
+      .catch(() => setResetInfo({ email: resetEmail, status: "invalid" }));
+  }, [resetEmail, resetToken, session?.token]);
 
   useEffect(() => {
     if (!session?.user) return;
@@ -1924,6 +1950,27 @@ export function DashboardApp() {
     }
   }
 
+  async function handleForgotPassword(email: string) {
+    setWorking(true);
+    setError(null);
+
+    try {
+      const response = await apiRequest<{ message: string }>("/auth/forgot-password", {
+        method: "POST",
+        body: { email }
+      });
+      pushToast("Reset email sent", response.message);
+      setWorking(false);
+
+      return response;
+    } catch (forgotPasswordError) {
+      setError(forgotPasswordError instanceof Error ? forgotPasswordError.message : "Unable to send reset email");
+      setWorking(false);
+
+      throw forgotPasswordError;
+    }
+  }
+
   async function handleRegister(payload: { token: string; name: string; password: string; passwordConfirmation: string }) {
     setWorking(true);
     setError(null);
@@ -1943,6 +1990,38 @@ export function DashboardApp() {
     } catch (registerError) {
       setError(registerError instanceof Error ? registerError.message : "Unable to register");
       setWorking(false);
+    }
+  }
+
+  async function handlePasswordReset(payload: { email: string; token: string; password: string; passwordConfirmation: string }) {
+    setWorking(true);
+    setError(null);
+
+    try {
+      const response = await apiRequest<Session>("/auth/reset-password", {
+        method: "POST",
+        body: {
+          email: payload.email,
+          token: payload.token,
+          password: payload.password,
+          password_confirmation: payload.passwordConfirmation
+        }
+      });
+
+      persistSession(response);
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("reset");
+        url.searchParams.delete("email");
+        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      }
+      await refreshWorkspace(response.token, true);
+      pushToast("Password reset", "Your password was updated and you are signed in.");
+    } catch (resetPasswordError) {
+      setError(resetPasswordError instanceof Error ? resetPasswordError.message : "Unable to reset password");
+      setWorking(false);
+
+      throw resetPasswordError;
     }
   }
 
@@ -3413,7 +3492,12 @@ export function DashboardApp() {
         inviteToken={inviteToken}
         loading={working || loading}
         onLogin={handleLogin}
+        onRequestPasswordReset={handleForgotPassword}
         onRegister={handleRegister}
+        onResetPassword={handlePasswordReset}
+        resetEmail={resetInfo?.email ?? resetEmail}
+        resetStatus={resetInfo?.status ?? null}
+        resetToken={resetToken}
       />
     );
   }

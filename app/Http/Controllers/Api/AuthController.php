@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Invite;
 use App\Models\User;
+use Illuminate\Auth\Events\PasswordReset;
 use App\Support\WorkspaceAccess;
 use App\Support\WorkspaceAuth;
 use App\Support\WorkspaceMailer;
@@ -12,6 +13,8 @@ use App\Support\WorkspacePresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -35,6 +38,116 @@ class AuthController extends Controller
         return response()->json([
             'token' => WorkspaceAuth::issueToken($user),
             'user' => WorkspacePresenter::user($user),
+        ]);
+    }
+
+    public function requestPasswordReset(Request $request): JsonResponse
+    {
+        $payload = $request->validate([
+            'email' => ['required', 'email'],
+        ]);
+
+        $email = strtolower($payload['email']);
+        $rateKey = 'password-reset-request:' . sha1($email . '|' . $request->ip());
+
+        if (RateLimiter::tooManyAttempts($rateKey, 3)) {
+            return response()->json([
+                'message' => 'Please wait a minute before requesting another reset email.',
+            ], 429);
+        }
+
+        RateLimiter::hit($rateKey, 60);
+
+        $user = User::query()
+            ->where('email', $email)
+            ->where('is_active', true)
+            ->first();
+
+        if ($user) {
+            $token = Password::broker()->createToken($user);
+            app(WorkspaceMailer::class)->sendPasswordResetLink($user, $token);
+        }
+
+        return response()->json([
+            'message' => 'If that email exists, a secure reset link has been sent.',
+        ]);
+    }
+
+    public function showPasswordReset(Request $request): JsonResponse
+    {
+        $payload = $request->validate([
+            'email' => ['required', 'email'],
+            'token' => ['required', 'string', 'min:10'],
+        ]);
+
+        $email = strtolower($payload['email']);
+        $user = User::query()
+            ->where('email', $email)
+            ->where('is_active', true)
+            ->first();
+
+        $status = $user && Password::broker()->tokenExists($user, $payload['token'])
+            ? 'valid'
+            : 'invalid';
+
+        return response()->json([
+            'reset' => [
+                'email' => $email,
+                'status' => $status,
+            ],
+        ]);
+    }
+
+    public function completePasswordReset(Request $request): JsonResponse
+    {
+        $payload = $request->validate([
+            'email' => ['required', 'email'],
+            'token' => ['required', 'string', 'min:10'],
+            'password' => ['required', 'string', 'min:10', 'max:128', 'confirmed', 'regex:/[a-z]/', 'regex:/[A-Z]/', 'regex:/[0-9]/', 'regex:/[^A-Za-z0-9]/'],
+        ]);
+
+        $email = strtolower($payload['email']);
+
+        $status = Password::broker()->reset(
+            [
+                'email' => $email,
+                'token' => $payload['token'],
+                'password' => $payload['password'],
+                'password_confirmation' => $request->input('password_confirmation'),
+            ],
+            function (User $user, string $password): void {
+                $user->forceFill([
+                    'password' => Hash::make($password),
+                    'remember_token' => Str::random(60),
+                    'api_token' => null,
+                ])->save();
+
+                event(new PasswordReset($user));
+            }
+        );
+
+        if ($status !== Password::PASSWORD_RESET) {
+            return response()->json([
+                'message' => 'This reset link is invalid or has expired. Request a new password reset email and try again.',
+            ], 422);
+        }
+
+        $user = User::query()
+            ->where('email', $email)
+            ->where('is_active', true)
+            ->first();
+
+        if (! $user) {
+            return response()->json([
+                'message' => 'This account is no longer active. Contact support if you need help accessing the workspace.',
+            ], 403);
+        }
+
+        app(WorkspaceMailer::class)->sendPasswordResetConfirmation($user);
+
+        return response()->json([
+            'token' => WorkspaceAuth::issueToken($user->fresh()),
+            'user' => WorkspacePresenter::user($user->fresh()),
         ]);
     }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Eye, EyeOff, FolderKanban, LockKeyhole, Mail, MessagesSquare } from "lucide-react";
+import { ArrowLeft, ArrowRight, Eye, EyeOff, FolderKanban, LockKeyhole, Mail, MessagesSquare } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { BrandingSettings, UserRole } from "@/lib/types";
@@ -14,59 +14,123 @@ type InviteInfo = {
   status: "pending" | "accepted" | "expired";
 } | null;
 
+type ResetStatus = "valid" | "invalid" | null;
+type AuthMode = "login" | "invite" | "forgot" | "reset";
+
 export function AuthScreen({
   inviteToken,
   inviteInfo,
+  resetToken,
+  resetEmail,
+  resetStatus,
   branding,
   loading,
   error,
   onLogin,
-  onRegister
+  onRegister,
+  onRequestPasswordReset,
+  onResetPassword
 }: {
   inviteToken: string | null;
   inviteInfo: InviteInfo;
+  resetToken: string | null;
+  resetEmail: string | null;
+  resetStatus: ResetStatus;
   branding: BrandingSettings;
   loading: boolean;
   error: string | null;
   onLogin: (email: string, password: string) => Promise<void>;
   onRegister: (payload: { token: string; name: string; password: string; passwordConfirmation: string }) => Promise<void>;
+  onRequestPasswordReset: (email: string) => Promise<void>;
+  onResetPassword: (payload: { email: string; token: string; password: string; passwordConfirmation: string }) => Promise<void>;
 }) {
-  const [mode, setMode] = useState<"login" | "invite">(inviteToken ? "invite" : "login");
+  const [mode, setMode] = useState<AuthMode>(inviteToken ? "invite" : resetToken && resetEmail ? "reset" : "login");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginPasswordVisible, setLoginPasswordVisible] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
   const [registerName, setRegisterName] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
   const [registerPasswordConfirmation, setRegisterPasswordConfirmation] = useState("");
   const [registerPasswordVisible, setRegisterPasswordVisible] = useState(false);
   const [registerPasswordConfirmationVisible, setRegisterPasswordConfirmationVisible] = useState(false);
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetPasswordConfirmation, setResetPasswordConfirmation] = useState("");
+  const [resetPasswordVisible, setResetPasswordVisible] = useState(false);
+  const [resetPasswordConfirmationVisible, setResetPasswordConfirmationVisible] = useState(false);
+  const [localNotice, setLocalNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!inviteToken) {
-      setMode("login");
+    if (inviteToken) {
+      setMode(inviteInfo?.status === "pending" ? "invite" : "login");
       return;
     }
 
-    setMode(inviteInfo?.status === "pending" ? "invite" : "login");
-  }, [inviteInfo?.status, inviteToken]);
+    if (resetToken && resetEmail) {
+      setMode("reset");
+      return;
+    }
+
+    setMode("login");
+  }, [inviteInfo?.status, inviteToken, resetEmail, resetToken]);
 
   useEffect(() => {
     if (!inviteInfo?.email) return;
     setLoginEmail((current) => (current.trim() ? current : inviteInfo.email));
   }, [inviteInfo?.email]);
 
+  useEffect(() => {
+    if (!resetEmail) return;
+    setForgotEmail((current) => (current.trim() ? current : resetEmail));
+    setLoginEmail((current) => (current.trim() ? current : resetEmail));
+  }, [resetEmail]);
+
   const inviteReady = Boolean(inviteToken && inviteInfo?.email && inviteInfo.status === "pending");
   const showInviteTabs = Boolean(inviteToken && inviteInfo?.status === "pending");
   const registerPasswordsMatch = registerPassword === registerPasswordConfirmation;
   const showRegisterPasswordMismatch = registerPasswordConfirmation.trim().length > 0 && !registerPasswordsMatch;
-  const inviteNotice =
-    inviteInfo?.status === "accepted"
-      ? "This invite has already been used. Sign in with the invited email to continue."
-      : inviteInfo?.status === "expired"
-        ? "This invite link has expired. Ask an admin for a new invite."
-        : mode === "invite"
-          ? "Complete your account and enter the platform."
-          : "Sign in to continue.";
+  const resetReady = Boolean(resetToken && resetEmail && resetStatus === "valid");
+  const resetPasswordsMatch = resetPassword === resetPasswordConfirmation;
+  const showResetPasswordMismatch = resetPasswordConfirmation.trim().length > 0 && !resetPasswordsMatch;
+
+  const heading = (() => {
+    if (mode === "invite") return "Accept invite";
+    if (mode === "forgot") return "Forgot password";
+    if (mode === "reset") return "Reset password";
+    return "Sign in";
+  })();
+
+  const subtitle = (() => {
+    if (mode === "invite") return "Invite access";
+    if (mode === "forgot" || mode === "reset") return "Account recovery";
+    return "Workspace access";
+  })();
+
+  const helperCopy = (() => {
+    if (inviteInfo?.status === "accepted") {
+      return "This invite has already been used. Sign in with the invited email to continue.";
+    }
+
+    if (inviteInfo?.status === "expired") {
+      return "This invite link has expired. Ask an admin for a new invite.";
+    }
+
+    if (mode === "invite") {
+      return "Complete your account and enter the platform.";
+    }
+
+    if (mode === "forgot") {
+      return "Enter your workspace email and we will send a secure reset link if the account exists.";
+    }
+
+    if (mode === "reset") {
+      return resetStatus === "invalid"
+        ? "This reset link is invalid or expired. Request a fresh email to continue."
+        : "Choose a new password. Older sign-ins will be cleared automatically after the reset.";
+    }
+
+    return "Sign in to continue.";
+  })();
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.10),_transparent_32%),linear-gradient(180deg,_#f8fafc_0%,_#eef2f7_100%)] px-4 py-4 dark:bg-[radial-gradient(circle_at_top,_rgba(132,204,22,0.10),_transparent_30%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] sm:px-6">
@@ -92,17 +156,16 @@ export function AuthScreen({
               <AccessStrip icon={<MessagesSquare className="h-4 w-4" />} label="Chat" value="Direct replies and requests" />
               <AccessStrip icon={<LockKeyhole className="h-4 w-4" />} label="Access" value="Secure invite-based entry" />
             </div>
-
           </section>
 
           <section className="surface-strong rounded-[38px] p-6 sm:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <BrandMark branding={branding} compact subtitle={mode === "invite" ? "Invite access" : "Workspace access"} />
+                <BrandMark branding={branding} compact subtitle={subtitle} />
                 <h2 className="mt-3 font-display text-3xl leading-tight text-slate-900 dark:text-white sm:text-4xl">
-                  {mode === "invite" ? "Accept invite" : "Sign in"}
+                  {heading}
                 </h2>
-                <p className="mt-2 hidden text-sm text-slate-500 dark:text-slate-400 sm:block">{inviteNotice}</p>
+                <p className="mt-2 hidden text-sm text-slate-500 dark:text-slate-400 sm:block">{helperCopy}</p>
                 <div className="scrollbar-thin -mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 lg:hidden">
                   <CompactAccessChip icon={<FolderKanban className="h-3.5 w-3.5" />} label="Projects" />
                   <CompactAccessChip icon={<MessagesSquare className="h-3.5 w-3.5" />} label="Chat" />
@@ -112,6 +175,10 @@ export function AuthScreen({
               {inviteToken ? (
                 <span className="rounded-full bg-accent-500/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-accent-700 dark:bg-lime-500/12 dark:text-lime-300">
                   Invite
+                </span>
+              ) : mode === "forgot" || mode === "reset" ? (
+                <span className="rounded-full bg-accent-500/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-accent-700 dark:bg-lime-500/12 dark:text-lime-300">
+                  Recovery
                 </span>
               ) : null}
             </div>
@@ -155,6 +222,12 @@ export function AuthScreen({
               </div>
             ) : null}
 
+            {mode === "reset" && resetStatus === "invalid" ? (
+              <div className="mt-5 rounded-[24px] border border-amber-300/60 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:border-amber-400/30 dark:text-amber-300">
+                This reset link is invalid or expired. Request another password reset email below.
+              </div>
+            ) : null}
+
             <div className="mt-6 rounded-[30px] border border-slate-200/70 bg-white/76 p-5 shadow-[0_24px_80px_rgba(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-950/46 sm:p-6">
               {mode === "login" ? (
                 <form
@@ -175,7 +248,20 @@ export function AuthScreen({
                     />
                   </div>
                   <div>
-                    <FieldLabel>Password</FieldLabel>
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <FieldLabel>Password</FieldLabel>
+                      <button
+                        className="text-xs font-semibold text-accent-700 transition hover:text-accent-800 dark:text-lime-300 dark:hover:text-lime-200"
+                        onClick={() => {
+                          setLocalNotice(null);
+                          setForgotEmail(loginEmail);
+                          setMode("forgot");
+                        }}
+                        type="button"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
                     <PasswordField
                       autoComplete="current-password"
                       onChange={setLoginPassword}
@@ -190,13 +276,14 @@ export function AuthScreen({
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </form>
-              ) : (
+              ) : null}
+
+              {mode === "invite" ? (
                 <form
                   className="space-y-4"
                   onSubmit={(event) => {
                     event.preventDefault();
-                    if (!inviteToken) return;
-                    if (!registerPasswordsMatch) return;
+                    if (!inviteToken || !registerPasswordsMatch) return;
 
                     void onRegister({
                       token: inviteToken,
@@ -206,28 +293,10 @@ export function AuthScreen({
                     });
                   }}
                 >
-                  <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/85 px-4 py-4 dark:border-slate-800 dark:bg-slate-900/65">
-                    <div className="flex items-start gap-3">
-                      <div className="rounded-2xl bg-accent-500/10 p-3 text-accent-700 dark:bg-lime-500/10 dark:text-lime-300">
-                        <Mail className="h-5 w-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-slate-900 dark:text-white">
-                          {inviteInfo ? labelize(inviteInfo.role) : "Invite required"}
-                        </p>
-                        <p className="mt-1 truncate text-sm text-slate-500 dark:text-slate-400">
-                          {inviteInfo?.email ?? "Open your invite link to continue."}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                  <InviteIdentity inviteInfo={inviteInfo} />
                   <div>
                     <FieldLabel>Email address</FieldLabel>
-                    <TextField
-                      className="bg-slate-100/95 text-slate-500 dark:bg-slate-900/70 dark:text-slate-300"
-                      readOnly
-                      value={inviteInfo?.email ?? ""}
-                    />
+                    <TextField className="bg-slate-100/95 text-slate-500 dark:bg-slate-900/70 dark:text-slate-300" readOnly value={inviteInfo?.email ?? ""} />
                   </div>
                   <div>
                     <FieldLabel>Full name</FieldLabel>
@@ -281,19 +350,163 @@ export function AuthScreen({
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </form>
-              )}
+              ) : null}
+
+              {mode === "forgot" ? (
+                <form
+                  className="space-y-4"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    setLocalNotice(null);
+                    void onRequestPasswordReset(forgotEmail)
+                      .then(() => {
+                        setLocalNotice("If that account exists, a secure reset email is on the way. Check your inbox and spam folder.");
+                      })
+                      .catch(() => undefined);
+                  }}
+                >
+                  <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/85 px-4 py-4 text-sm leading-6 text-slate-500 dark:border-slate-800 dark:bg-slate-900/65 dark:text-slate-400">
+                    Enter the email tied to the workspace. We will send a single-use reset link that expires automatically.
+                  </div>
+                  <div>
+                    <FieldLabel>Email address</FieldLabel>
+                    <TextField
+                      autoComplete="email"
+                      onChange={(event) => setForgotEmail(event.target.value)}
+                      placeholder="name@company.com"
+                      type="email"
+                      value={forgotEmail}
+                    />
+                  </div>
+                  <Button className="w-full" disabled={loading || !forgotEmail.trim()} type="submit">
+                    Send reset email
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                  <button
+                    className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                    onClick={() => {
+                      setLocalNotice(null);
+                      setMode("login");
+                    }}
+                    type="button"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to sign in
+                  </button>
+                </form>
+              ) : null}
+
+              {mode === "reset" ? (
+                <form
+                  className="space-y-4"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (!resetToken || !resetEmail || !resetPasswordsMatch) return;
+
+                    void onResetPassword({
+                      email: resetEmail,
+                      token: resetToken,
+                      password: resetPassword,
+                      passwordConfirmation: resetPasswordConfirmation
+                    });
+                  }}
+                >
+                  <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/85 px-4 py-4 text-sm leading-6 text-slate-500 dark:border-slate-800 dark:bg-slate-900/65 dark:text-slate-400">
+                    Use a fresh password with uppercase, lowercase, a number, and a symbol. When the reset completes, older sign-ins are cleared automatically.
+                  </div>
+                  <div>
+                    <FieldLabel>Email address</FieldLabel>
+                    <TextField className="bg-slate-100/95 text-slate-500 dark:bg-slate-900/70 dark:text-slate-300" readOnly value={resetEmail ?? ""} />
+                  </div>
+                  <div>
+                    <FieldLabel>New password</FieldLabel>
+                    <PasswordField
+                      autoComplete="new-password"
+                      onChange={setResetPassword}
+                      onToggleVisibility={() => setResetPasswordVisible((current) => !current)}
+                      placeholder="Create a new password"
+                      value={resetPassword}
+                      visible={resetPasswordVisible}
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel>Confirm new password</FieldLabel>
+                    <PasswordField
+                      autoComplete="new-password"
+                      onChange={setResetPasswordConfirmation}
+                      onToggleVisibility={() => setResetPasswordConfirmationVisible((current) => !current)}
+                      placeholder="Re-enter the new password"
+                      value={resetPasswordConfirmation}
+                      visible={resetPasswordConfirmationVisible}
+                    />
+                    {showResetPasswordMismatch ? (
+                      <p className="mt-2 text-xs leading-5 text-rose-600 dark:text-rose-300">
+                        New password and confirmation do not match yet.
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                        Confirm the new password so the reset finishes cleanly on the first try.
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    className="w-full"
+                    disabled={loading || !resetReady || !resetPassword.trim() || !resetPasswordConfirmation.trim() || !resetPasswordsMatch}
+                    type="submit"
+                  >
+                    Reset password
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                  <button
+                    className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                    onClick={() => {
+                      setLocalNotice(null);
+                      setMode("forgot");
+                    }}
+                    type="button"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Request another email
+                  </button>
+                </form>
+              ) : null}
             </div>
+
+            {localNotice ? (
+              <div className="mt-4 rounded-[24px] border border-sky-300/60 bg-sky-500/10 px-4 py-3 text-sm text-sky-700 dark:border-sky-400/30 dark:text-sky-300">
+                {localNotice}
+              </div>
+            ) : null}
 
             {error ? (
               <div className="mt-4 rounded-[24px] border border-rose-300/60 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/25 dark:text-rose-300">
                 {error}
               </div>
             ) : null}
-
           </section>
         </div>
       </div>
     </main>
+  );
+}
+
+function InviteIdentity({ inviteInfo }: { inviteInfo: InviteInfo }) {
+  return (
+    <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/85 px-4 py-4 dark:border-slate-800 dark:bg-slate-900/65">
+      <div className="flex items-start gap-3">
+        <div className="rounded-2xl bg-accent-500/10 p-3 text-accent-700 dark:bg-lime-500/10 dark:text-lime-300">
+          <Mail className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <p className="font-semibold text-slate-900 dark:text-white">
+            {inviteInfo ? labelize(inviteInfo.role) : "Invite required"}
+          </p>
+          <p className="mt-1 truncate text-sm text-slate-500 dark:text-slate-400">
+            {inviteInfo?.email ?? "Open your invite link to continue."}
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -355,11 +568,11 @@ function PasswordField({
     <div className="relative">
       <TextField
         autoComplete={autoComplete}
+        className="pr-12"
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         type={visible ? "text" : "password"}
         value={value}
-        className="pr-12"
       />
       <button
         aria-label={visible ? "Hide password" : "Show password"}

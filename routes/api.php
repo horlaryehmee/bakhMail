@@ -14,6 +14,9 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('app.installed')->group(function (): void {
     Route::prefix('auth')->group(function (): void {
         Route::post('/login', [AuthController::class, 'login']);
+        Route::post('/forgot-password', [AuthController::class, 'requestPasswordReset']);
+        Route::get('/password-reset', [AuthController::class, 'showPasswordReset']);
+        Route::post('/reset-password', [AuthController::class, 'completePasswordReset']);
         Route::post('/register-invite', [AuthController::class, 'registerInvite']);
         Route::get('/invites/{token}', [AuthController::class, 'showInvite']);
 

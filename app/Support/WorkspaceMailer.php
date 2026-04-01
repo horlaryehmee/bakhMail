@@ -58,6 +58,56 @@ class WorkspaceMailer
         );
     }
 
+    public function sendPasswordResetLink(User $user, string $token): void
+    {
+        $branding = $this->branding();
+        $resetUrl = rtrim($branding['appUrl'], '/') . '/?reset=' . urlencode($token) . '&email=' . urlencode($user->email);
+        $expiryMinutes = (int) config('auth.passwords.users.expire', 60);
+
+        $this->sendToAddress(
+            $user->email,
+            [
+                'subject' => "Reset your {$branding['brandName']} password",
+                'eyebrow' => 'Account recovery',
+                'headline' => 'Reset your workspace password',
+                'intro' => 'We received a request to reset the password for your workspace account.',
+                'body' => 'Use the secure button below to choose a new password. If you did not request this, you can ignore the email and your current password will keep working.',
+                'actionLabel' => 'Reset password',
+                'actionUrl' => $resetUrl,
+                'details' => [
+                    ['label' => 'Account', 'value' => $user->email],
+                    ['label' => 'Link expires', 'value' => "{$expiryMinutes} minutes"],
+                ],
+                'footer' => 'For security, this link can only be used once and older sign-ins will be cleared after a successful reset.',
+                'recipientName' => $user->name,
+            ]
+        );
+    }
+
+    public function sendPasswordResetConfirmation(User $user): void
+    {
+        $branding = $this->branding();
+
+        $this->sendToAddress(
+            $user->email,
+            [
+                'subject' => "{$branding['brandName']} password updated",
+                'eyebrow' => 'Security update',
+                'headline' => 'Your password was changed',
+                'intro' => 'The password for your workspace account was reset successfully.',
+                'body' => 'If this was you, no further action is needed. If you did not make this change, contact your workspace administrator immediately.',
+                'actionLabel' => 'Open workspace',
+                'actionUrl' => $branding['appUrl'],
+                'details' => [
+                    ['label' => 'Account', 'value' => $user->email],
+                    ['label' => 'Changed at', 'value' => now()->format('M j, Y g:i A')],
+                ],
+                'footer' => 'As a security precaution, older sign-ins were invalidated when the password changed.',
+                'recipientName' => $user->name,
+            ]
+        );
+    }
+
     public function sendTestMessage(string $email): void
     {
         $branding = $this->branding();
