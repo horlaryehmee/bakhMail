@@ -46,34 +46,23 @@
                                         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#0f172a;">
                                             <tr>
                                                 <td style="padding:28px 30px 10px;">
-                                                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                                    <table role="presentation" cellspacing="0" cellpadding="0">
                                                         <tr>
                                                             <td style="vertical-align:middle;">
-                                                                <table role="presentation" cellspacing="0" cellpadding="0">
-                                                                    <tr>
-                                                                        <td style="vertical-align:middle;">
-                                                                            @if ($logoUrl)
-                                                                                <img src="{{ $logoUrl }}" alt="{{ $brandName }} logo" style="display:block;max-width:52px;max-height:52px;border-radius:16px;border:1px solid rgba(255,255,255,0.10);background:#0b1321;">
-                                                                            @else
-                                                                                <div style="width:52px;height:52px;border-radius:16px;background:#84cc16;color:#07111f;font-size:20px;font-weight:800;line-height:52px;text-align:center;">
-                                                                                    {{ strtoupper(substr($brandName, 0, 1)) }}
-                                                                                </div>
-                                                                            @endif
-                                                                        </td>
-                                                                        <td style="padding-left:12px;vertical-align:middle;">
-                                                                            <div style="font-size:11px;line-height:1.4;letter-spacing:0.18em;text-transform:uppercase;color:#8fa2c1;">
-                                                                                Workspace signal
-                                                                            </div>
-                                                                            <div style="margin-top:6px;font-size:20px;line-height:1.2;font-weight:700;color:#f8fbff;">
-                                                                                {{ $brandName }}
-                                                                            </div>
-                                                                        </td>
-                                                                    </tr>
-                                                                </table>
+                                                                @if ($logoUrl)
+                                                                    <img src="{{ $logoUrl }}" alt="{{ $brandName }} logo" style="display:block;max-width:56px;max-height:56px;border-radius:18px;border:1px solid rgba(255,255,255,0.10);background:#0b1321;">
+                                                                @else
+                                                                    <div style="width:56px;height:56px;border-radius:18px;background:#84cc16;color:#07111f;font-size:20px;font-weight:800;line-height:56px;text-align:center;">
+                                                                        {{ strtoupper(substr($brandName, 0, 1)) }}
+                                                                    </div>
+                                                                @endif
                                                             </td>
-                                                            <td align="right" style="vertical-align:middle;">
-                                                                <div style="display:inline-block;border-radius:999px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.06);padding:8px 12px;font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#d9e5f8;">
-                                                                    Secure delivery
+                                                            <td style="padding-left:14px;vertical-align:middle;">
+                                                                <div style="font-size:11px;line-height:1.4;letter-spacing:0.18em;text-transform:uppercase;color:#8fa2c1;">
+                                                                    Workspace signal
+                                                                </div>
+                                                                <div style="margin-top:6px;font-size:20px;line-height:1.2;font-weight:700;color:#f8fbff;">
+                                                                    {{ $brandName }}
                                                                 </div>
                                                             </td>
                                                         </tr>
@@ -123,27 +112,22 @@
                                     <tr>
                                         <td style="padding:0 30px 10px;">
                                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                                                @foreach (array_chunk($details, 2) as $row)
+                                                @foreach ($details as $detail)
                                                     <tr>
-                                                        @foreach ($row as $detail)
-                                                            <td width="50%" style="padding:0 10px 10px 0;vertical-align:top;">
-                                                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #e2eaf5;border-radius:20px;background:#f8fbff;">
-                                                                    <tr>
-                                                                        <td style="padding:16px 16px 15px;">
-                                                                            <div style="font-size:10px;line-height:1.4;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#8ca0bc;">
-                                                                                {{ $detail['label'] }}
-                                                                            </div>
-                                                                            <div style="margin-top:8px;font-size:15px;line-height:1.55;font-weight:700;color:#0f172a;">
-                                                                                {{ $detail['value'] }}
-                                                                            </div>
-                                                                        </td>
-                                                                    </tr>
-                                                                </table>
-                                                            </td>
-                                                        @endforeach
-                                                        @if (count($row) === 1)
-                                                            <td width="50%" style="padding:0 0 10px;"></td>
-                                                        @endif
+                                                        <td style="padding:0 0 10px;vertical-align:top;">
+                                                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #e2eaf5;border-radius:20px;background:#f8fbff;">
+                                                                <tr>
+                                                                    <td style="padding:16px 16px 15px;">
+                                                                        <div style="font-size:10px;line-height:1.4;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#8ca0bc;">
+                                                                            {{ $detail['label'] }}
+                                                                        </div>
+                                                                        <div style="margin-top:8px;font-size:15px;line-height:1.55;font-weight:700;color:#0f172a;">
+                                                                            {{ $detail['value'] }}
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            </table>
+                                                        </td>
                                                     </tr>
                                                 @endforeach
                                             </table>
