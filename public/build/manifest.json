@@ -1,23 +1,23 @@
 {
-  "_mail-BCi8Guyo.js": {
-    "file": "assets/mail-BCi8Guyo.js",
+  "_mail-082ZGYc4.js": {
+    "file": "assets/mail-082ZGYc4.js",
     "name": "mail",
     "imports": [
-      "_ui-BvjWe2nw.js"
+      "_ui-CC-Qa4nk.js"
     ]
   },
-  "_ui-BvjWe2nw.js": {
-    "file": "assets/ui-BvjWe2nw.js",
+  "_ui-CC-Qa4nk.js": {
+    "file": "assets/ui-CC-Qa4nk.js",
     "name": "ui",
     "imports": [
       "resources/js/app.jsx"
     ]
   },
-  "_users-CbLMBrNW.js": {
-    "file": "assets/users-CbLMBrNW.js",
+  "_users-JeZRR1vA.js": {
+    "file": "assets/users-JeZRR1vA.js",
     "name": "users",
     "imports": [
-      "_ui-BvjWe2nw.js"
+      "_ui-CC-Qa4nk.js"
     ]
   },
   "resources/css/app.css": {
@@ -30,41 +30,41 @@
     "isEntry": true
   },
   "resources/js/Pages/Auth.jsx": {
-    "file": "assets/Auth-BjXXjRmo.js",
+    "file": "assets/Auth-DoCPFnxb.js",
     "name": "Auth",
     "src": "resources/js/Pages/Auth.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "_ui-BvjWe2nw.js",
-      "_mail-BCi8Guyo.js"
+      "_ui-CC-Qa4nk.js",
+      "_mail-082ZGYc4.js"
     ]
   },
   "resources/js/Pages/Dashboard.jsx": {
-    "file": "assets/Dashboard-iQfLY_Y9.js",
+    "file": "assets/Dashboard-B8PLdpNe.js",
     "name": "Dashboard",
     "src": "resources/js/Pages/Dashboard.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "_ui-BvjWe2nw.js",
-      "_users-CbLMBrNW.js"
+      "_ui-CC-Qa4nk.js",
+      "_users-JeZRR1vA.js"
     ]
   },
   "resources/js/Pages/Workspace.tsx": {
-    "file": "assets/Workspace-DldoRn2h.js",
+    "file": "assets/Workspace-BkUGqNng.js",
     "name": "Workspace",
     "src": "resources/js/Pages/Workspace.tsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
-      "_ui-BvjWe2nw.js",
-      "_mail-BCi8Guyo.js",
-      "_users-CbLMBrNW.js"
+      "_ui-CC-Qa4nk.js",
+      "_mail-082ZGYc4.js",
+      "_users-JeZRR1vA.js"
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-Dzyc9MEf.js",
+    "file": "assets/app-Dl-i0SR3.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,

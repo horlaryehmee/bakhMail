@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\WorkspaceNotification;
 use App\Models\WorkspaceRequest;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 class WorkspacePresenter
 {
@@ -27,10 +28,17 @@ class WorkspacePresenter
 
     public static function branding(?BrandingSetting $branding): array
     {
+        $logoUrl = trim((string) ($branding?->logo_url ?? ''));
+
+        if ($logoUrl !== '' && ! Str::startsWith($logoUrl, ['http://', 'https://', 'data:', '/'])) {
+            $logoUrl = '/' . ltrim($logoUrl, '/');
+        }
+
         return [
             'brandName' => trim($branding?->brand_name ?: 'Bakhtech Solutions'),
-            'logoUrl' => $branding?->logo_url ?: '',
+            'logoUrl' => $logoUrl,
             'logoSize' => (float) ($branding?->logo_size ?: 1),
+            'logoVersion' => optional($branding?->updated_at)?->timestamp ? (string) $branding->updated_at->timestamp : '',
         ];
     }
 

@@ -305,15 +305,22 @@ class WorkspaceMailer
     {
         $branding = BrandingSetting::query()->where('key', 'branding')->first();
         $appUrl = rtrim((string) config('app.url'), '/') ?: 'http://localhost';
-        $logoUrl = (string) ($branding?->logo_url ?? '');
+        $brandingPayload = WorkspacePresenter::branding($branding);
+        $logoUrl = (string) ($brandingPayload['logoUrl'] ?? '');
+        $logoVersion = (string) ($brandingPayload['logoVersion'] ?? '');
 
         if ($logoUrl !== '' && ! Str::startsWith($logoUrl, ['http://', 'https://', 'data:'])) {
             $logoUrl = $appUrl . '/' . ltrim($logoUrl, '/');
         }
 
+        if ($logoUrl !== '' && $logoVersion !== '') {
+            $logoUrl .= (str_contains($logoUrl, '?') ? '&' : '?') . 'v=' . rawurlencode($logoVersion);
+        }
+
         return [
-            'brandName' => trim((string) ($branding?->brand_name ?: config('app.name', 'TaskManager'))),
+            'brandName' => (string) ($brandingPayload['brandName'] ?? config('app.name', 'TaskManager')),
             'logoUrl' => $logoUrl,
+            'logoVersion' => $logoVersion,
             'appUrl' => $appUrl,
         ];
     }

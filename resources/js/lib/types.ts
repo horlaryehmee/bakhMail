@@ -25,6 +25,7 @@ export type BrandingSettings = {
   brandName: string;
   logoUrl: string;
   logoSize: number;
+  logoVersion?: string;
 };
 
 export type DemoDataAccount = {

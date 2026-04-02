@@ -32,7 +32,7 @@ class SettingsController extends Controller
             ['key' => 'branding'],
             [
                 'brand_name' => trim($payload['brandName']) ?: 'Bakhtech Solutions',
-                'logo_url' => $payload['logoUrl'] ?? '',
+                'logo_url' => trim((string) ($payload['logoUrl'] ?? '')),
                 'logo_size' => $payload['logoSize'],
             ]
         );

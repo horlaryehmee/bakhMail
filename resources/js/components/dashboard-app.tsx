@@ -88,7 +88,8 @@ const defaultNotificationPreferences: NotificationPreferences = {
 const defaultBranding: BrandingSettings = {
   brandName: "Bakhtech Solutions",
   logoUrl: "",
-  logoSize: 1
+  logoSize: 1,
+  logoVersion: ""
 };
 const voiceNoteMimeTypeOptions = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus", "audio/ogg", "audio/mpeg"];
 
@@ -1546,6 +1547,44 @@ export function DashboardApp() {
     const brandTitle = branding.brandName?.trim() || defaultBranding.brandName;
     document.title = `${brandTitle} Workspace`;
   }, [branding.brandName]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const resolvedLogoUrl = assetUrl(branding.logoUrl, branding.logoVersion);
+    const managedIcons = document.head.querySelectorAll('link[data-bakhtech-favicon="true"]');
+
+    if (!resolvedLogoUrl) {
+      managedIcons.forEach((icon) => icon.remove());
+      return;
+    }
+
+    const iconDefinitions = [
+      { rel: "icon", sizes: "" },
+      { rel: "apple-touch-icon", sizes: "180x180" }
+    ];
+
+    iconDefinitions.forEach(({ rel, sizes }) => {
+      const selector = `link[data-bakhtech-favicon="true"][rel="${rel}"]${sizes ? `[sizes="${sizes}"]` : ""}`;
+      const existing = document.head.querySelector<HTMLLinkElement>(selector);
+      const link = existing ?? document.createElement("link");
+
+      link.setAttribute("data-bakhtech-favicon", "true");
+      link.setAttribute("rel", rel);
+
+      if (sizes) {
+        link.setAttribute("sizes", sizes);
+      } else {
+        link.removeAttribute("sizes");
+      }
+
+      link.setAttribute("href", resolvedLogoUrl);
+
+      if (!existing) {
+        document.head.appendChild(link);
+      }
+    });
+  }, [branding.logoUrl, branding.logoVersion]);
 
   useEffect(() => {
     if (brandingFiles.length === 0) {

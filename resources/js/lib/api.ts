@@ -41,14 +41,22 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   return (await response.json()) as T;
 }
 
-export function assetUrl(url?: string | null) {
+export function assetUrl(url?: string | null, version?: string | number | null) {
   if (!url) {
     return "";
   }
 
-  if (url.startsWith("http")) {
-    return url;
+  let resolved = url;
+
+  if (!url.startsWith("http") && !url.startsWith("data:")) {
+    const normalized = url.startsWith("/") ? url : `/${url}`;
+    resolved = typeof window !== "undefined" ? new URL(normalized, window.location.origin).toString() : normalized;
   }
 
-  return url;
+  if (version === undefined || version === null || version === "") {
+    return resolved;
+  }
+
+  const separator = resolved.includes("?") ? "&" : "?";
+  return `${resolved}${separator}v=${encodeURIComponent(String(version))}`;
 }
