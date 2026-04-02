@@ -1390,6 +1390,7 @@ export function DashboardApp() {
   const [passwordForm, setPasswordForm] = useState<PasswordFormState>(emptyPasswordForm);
   const [brandingForm, setBrandingForm] = useState<BrandingFormState>(emptyBrandingForm);
   const [brandingFiles, setBrandingFiles] = useState<File[]>([]);
+  const [brandingPreviewUrl, setBrandingPreviewUrl] = useState<string>("");
   const [directorySearch, setDirectorySearch] = useState("");
   const [directoryRoleFilter, setDirectoryRoleFilter] = useState<string>("all");
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -1509,7 +1510,7 @@ export function DashboardApp() {
   async function uploadAttachments(files: File[]) {
     if (!session?.token || files.length === 0) return [];
     const formData = new FormData();
-    files.forEach((file) => formData.append("files", file));
+    files.forEach((file) => formData.append("files[]", file));
     const response = await apiRequest<{ attachments: Attachment[] }>("/uploads", {
       method: "POST",
       token: session.token,
@@ -1545,6 +1546,20 @@ export function DashboardApp() {
     const brandTitle = branding.brandName?.trim() || defaultBranding.brandName;
     document.title = `${brandTitle} Workspace`;
   }, [branding.brandName]);
+
+  useEffect(() => {
+    if (brandingFiles.length === 0) {
+      setBrandingPreviewUrl("");
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(brandingFiles[0]);
+    setBrandingPreviewUrl(previewUrl);
+
+    return () => {
+      URL.revokeObjectURL(previewUrl);
+    };
+  }, [brandingFiles]);
 
   useEffect(() => {
     if (!inviteToken || session?.token) return;
@@ -2356,6 +2371,7 @@ export function DashboardApp() {
         logoSize: response.branding.logoSize ?? defaultBranding.logoSize
       });
       setBrandingFiles([]);
+      setBrandingPreviewUrl("");
       pushToast("Brand updated", "The workspace branding was saved.");
       setWorking(false);
     } catch (brandingError) {
@@ -5251,7 +5267,7 @@ export function DashboardApp() {
                             <BrandMark
                               branding={{
                                 brandName: brandingForm.brandName.trim() || defaultBranding.brandName,
-                                logoUrl: brandingFiles.length ? "" : brandingForm.logoUrl,
+                                logoUrl: brandingPreviewUrl || brandingForm.logoUrl,
                                 logoSize: brandingForm.logoSize
                               }}
                               subtitle="Shown across the login page and workspace"
