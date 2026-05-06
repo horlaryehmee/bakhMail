@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EmailAccountController;
 use App\Http\Controllers\Api\GroqController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\InstallController;
@@ -38,6 +39,7 @@ Route::prefix('api')->group(function (): void {
 
     Route::middleware('auth')->group(function (): void {
         Route::get('/dashboard', [DashboardController::class, 'show'])->name('api.dashboard');
+        Route::put('/profile', [SettingsController::class, 'profile'])->name('api.profile.update');
 
         Route::get('/contacts/export', [ContactController::class, 'export'])->name('api.contacts.export');
         Route::post('/contacts/import', [ContactController::class, 'import'])->name('api.contacts.import');

@@ -11,6 +11,14 @@ import { useAppStore } from '../store/useAppStore';
 export function SettingsPage() {
   const user = useAppStore((state) => state.user);
   const setUser = useAppStore((state) => state.setUser);
+  const [profileForm, setProfileForm] = useState({
+    name: user?.name ?? '',
+    email: user?.email ?? '',
+    current_password: '',
+    new_password: '',
+    new_password_confirmation: '',
+  });
+  const [profileSaving, setProfileSaving] = useState(false);
   const [setupData, setSetupData] = useState(null);
   const [qrUrl, setQrUrl] = useState('');
   const [enableCode, setEnableCode] = useState('');
@@ -23,6 +31,36 @@ export function SettingsPage() {
       QRCode.toDataURL(setupData.otpauth_uri).then(setQrUrl).catch(() => setQrUrl(''));
     }
   }, [setupData]);
+
+  useEffect(() => {
+    setProfileForm((current) => ({
+      ...current,
+      name: user?.name ?? '',
+      email: user?.email ?? '',
+    }));
+  }, [user?.name, user?.email]);
+
+  async function saveProfile(event) {
+    event.preventDefault();
+    setProfileSaving(true);
+
+    try {
+      const response = await api.put('/api/profile', profileForm);
+      setUser(response.user);
+      setProfileForm((current) => ({
+        ...current,
+        current_password: '',
+        new_password: '',
+        new_password_confirmation: '',
+      }));
+      toast.success('Profile updated');
+    } catch (error) {
+      const firstError = Object.values(error.payload?.errors ?? {}).flat()[0];
+      toast.error(firstError || error.payload?.message || 'Could not update profile');
+    } finally {
+      setProfileSaving(false);
+    }
+  }
 
   async function beginSetup() {
     try {
@@ -87,6 +125,76 @@ export function SettingsPage() {
 
       <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
         <section className="surface-card p-5 sm:p-6">
+          <div>
+            <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Profile</p>
+            <h2 className="text-3xl font-semibold text-slate-950">Identity and password</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Update the operator name, login email, and password used to access this BakhMail workspace.
+            </p>
+          </div>
+
+          <form className="mt-6 space-y-4" onSubmit={saveProfile}>
+            <label className="field-shell">
+              <span className="field-label">Full name</span>
+              <input
+                className="field-input"
+                value={profileForm.name}
+                onChange={(event) => setProfileForm({ ...profileForm, name: event.target.value })}
+                required
+              />
+            </label>
+
+            <label className="field-shell">
+              <span className="field-label">Login email</span>
+              <input
+                className="field-input"
+                type="email"
+                value={profileForm.email}
+                onChange={(event) => setProfileForm({ ...profileForm, email: event.target.value })}
+                required
+              />
+            </label>
+
+            <label className="field-shell">
+              <span className="field-label">Current password</span>
+              <input
+                className="field-input"
+                type="password"
+                value={profileForm.current_password}
+                onChange={(event) => setProfileForm({ ...profileForm, current_password: event.target.value })}
+                required
+              />
+            </label>
+
+            <label className="field-shell">
+              <span className="field-label">New password</span>
+              <input
+                className="field-input"
+                type="password"
+                value={profileForm.new_password}
+                onChange={(event) => setProfileForm({ ...profileForm, new_password: event.target.value })}
+                placeholder="Leave blank to keep current password"
+              />
+            </label>
+
+            <label className="field-shell">
+              <span className="field-label">Confirm new password</span>
+              <input
+                className="field-input"
+                type="password"
+                value={profileForm.new_password_confirmation}
+                onChange={(event) => setProfileForm({ ...profileForm, new_password_confirmation: event.target.value })}
+                placeholder="Repeat the new password"
+              />
+            </label>
+
+            <button className="primary-button" type="submit" disabled={profileSaving}>
+              {profileSaving ? 'Saving...' : 'Save profile'}
+            </button>
+          </form>
+        </section>
+
+        <section className="surface-card p-5 sm:p-6">
           <div className="flex items-start gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
               <ShieldCheck size={18} />
@@ -129,7 +237,7 @@ export function SettingsPage() {
           </div>
         </section>
 
-        <section className="surface-card p-5 sm:p-6">
+        <section className="surface-card p-5 sm:p-6 xl:col-start-2">
           <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Deliverability notes</p>
           <h3 className="text-2xl font-semibold text-slate-950">Operational checklist</h3>
 
