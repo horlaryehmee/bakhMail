@@ -2,12 +2,10 @@
 
 namespace Database\Seeders;
 
-use App\Models\BrandingSetting;
 use App\Models\User;
-use App\Support\WorkspaceDemoData;
-use App\Support\WorkspacePresenter;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -18,26 +16,20 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $masterAdmin = User::query()->updateOrCreate([
-            'email' => 'admin@bakhtech.com',
-        ], [
-            'name' => 'Bakare Olayemi',
-            'password' => 'BakhtechAdmin123!',
-            'role' => 'master_admin',
-            'title' => 'Master Admin',
-            'notification_preferences' => WorkspacePresenter::defaultNotificationPreferences(),
-            'is_active' => true,
-            'demo_data' => false,
+        User::updateOrCreate(['email' => 'admin@bakhmail.test'], [
+            'name' => 'Admin User',
+            'password' => Hash::make('password'),
+            'role' => User::ROLE_ADMIN,
+            'timezone' => 'Africa/Lagos',
+            'avatar_color' => '#60a5fa',
         ]);
 
-        BrandingSetting::query()->updateOrCreate([
-            'key' => 'branding',
-        ], [
-            'brand_name' => 'Bakhtech Solutions',
-            'logo_url' => '',
-            'logo_size' => 1,
+        User::updateOrCreate(['email' => 'hello@bakhmail.test'], [
+            'name' => 'Growth User',
+            'password' => Hash::make('password'),
+            'role' => User::ROLE_STANDARD,
+            'timezone' => 'Africa/Lagos',
+            'avatar_color' => '#34d399',
         ]);
-
-        WorkspaceDemoData::populate($masterAdmin);
     }
 }

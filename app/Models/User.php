@@ -3,126 +3,77 @@
 namespace App\Models;
 
 use Database\Factories\UserFactory;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
+
+    public const ROLE_ADMIN = 'admin';
+
+    public const ROLE_STANDARD = 'standard';
 
     protected $fillable = [
         'name',
         'email',
         'password',
         'role',
-        'title',
-        'avatar_url',
-        'notification_preferences',
-        'is_active',
-        'api_token',
-        'demo_data',
+        'timezone',
+        'avatar_color',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
+        'two_factor_confirmed_at',
+        'last_seen_at',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
-        'api_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'notification_preferences' => 'array',
-            'is_active' => 'boolean',
-            'demo_data' => 'boolean',
+            'two_factor_recovery_codes' => 'array',
+            'two_factor_confirmed_at' => 'datetime',
+            'last_seen_at' => 'datetime',
         ];
     }
 
-    public function createdProjects(): HasMany
+    public function emailAccounts(): HasMany
     {
-        return $this->hasMany(Project::class, 'created_by_id');
+        return $this->hasMany(EmailAccount::class);
     }
 
-    public function teamProjects(): BelongsToMany
+    public function contacts(): HasMany
     {
-        return $this->belongsToMany(Project::class, 'project_team_members');
+        return $this->hasMany(Contact::class);
     }
 
-    public function clientProjects(): BelongsToMany
+    public function campaigns(): HasMany
     {
-        return $this->belongsToMany(Project::class, 'project_clients');
+        return $this->hasMany(Campaign::class);
     }
 
-    public function assignedTasks(): HasMany
+    public function analyticsSnapshots(): HasMany
     {
-        return $this->hasMany(Task::class, 'assignee_id');
+        return $this->hasMany(AnalyticsSnapshot::class);
     }
 
-    public function reportedTasks(): HasMany
+    public function activityLogs(): HasMany
     {
-        return $this->hasMany(Task::class, 'reporter_id');
+        return $this->hasMany(ActivityLog::class);
     }
 
-    public function comments(): HasMany
+    public function isAdmin(): bool
     {
-        return $this->hasMany(Comment::class, 'author_id');
-    }
-
-    public function requests(): HasMany
-    {
-        return $this->hasMany(WorkspaceRequest::class, 'created_by_id');
-    }
-
-    public function notifications(): HasMany
-    {
-        return $this->hasMany(WorkspaceNotification::class, 'recipient_id');
-    }
-
-    public function invitesSent(): HasMany
-    {
-        return $this->hasMany(Invite::class, 'invited_by_id');
-    }
-
-    public function activities(): HasMany
-    {
-        return $this->hasMany(ActivityLog::class, 'actor_id');
-    }
-
-    protected function notificationPreferences(): Attribute
-    {
-        return Attribute::make(
-            get: fn ($value, array $attributes) => $attributes['notification_preferences']
-                ? json_decode($attributes['notification_preferences'], true)
-                : [
-                    'comments' => true,
-                    'requests' => true,
-                    'deadlines' => true,
-                    'activity' => true,
-                ],
-        );
-    }
-
-    public function wantsEmailFor(string $channel): bool
-    {
-        $preferences = array_merge([
-            'comments' => true,
-            'requests' => true,
-            'deadlines' => true,
-            'activity' => true,
-        ], $this->notification_preferences ?? []);
-
-        return (bool) ($preferences[$channel] ?? false);
+        return $this->role === self::ROLE_ADMIN;
     }
 }

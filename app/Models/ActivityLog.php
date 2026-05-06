@@ -10,28 +10,30 @@ class ActivityLog extends Model
 {
     use HasFactory;
 
+    public $timestamps = false;
+
     protected $fillable = [
-        'actor_id',
+        'user_id',
         'action',
-        'message',
-        'entity_type',
-        'entity_id',
-        'project_id',
-        'task_id',
-        'metadata',
-        'demo_data',
+        'subject_type',
+        'subject_id',
+        'description',
+        'properties',
+        'ip_address',
+        'user_agent',
+        'created_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'metadata' => 'array',
-            'demo_data' => 'boolean',
+            'properties' => 'array',
+            'created_at' => 'datetime',
         ];
     }
 
-    public function actor(): BelongsTo
+    public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'actor_id');
+        return $this->belongsTo(User::class);
     }
 }

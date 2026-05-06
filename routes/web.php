@@ -1,13 +1,73 @@
 <?php
 
-use App\Http\Controllers\InstallController;
+use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\AnalyticsController;
+use App\Http\Controllers\Api\CampaignController;
+use App\Http\Controllers\Api\ContactController;
+use App\Http\Controllers\Api\ConversationController;
+use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\EmailAccountController;
+use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\TwoFactorController;
+use App\Http\Controllers\PublicTrackingController;
+use App\Http\Controllers\SpaController;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
-Route::get('/install', [InstallController::class, 'show'])->name('install.show');
-Route::post('/install', [InstallController::class, 'install'])->name('install.run');
-
-Route::middleware('app.installed')->group(function (): void {
-    Route::get('/', fn () => Inertia::render('Workspace'))->name('workspace');
-    Route::get('/dashboard', fn () => Inertia::render('Workspace'))->name('dashboard');
+Route::prefix('auth')->group(function (): void {
+    Route::post('/register', [AuthController::class, 'register'])->name('auth.register');
+    Route::post('/login', [AuthController::class, 'login'])->name('auth.login');
+    Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('auth.logout');
+    Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->name('auth.forgot-password');
+    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('auth.reset-password');
+    Route::post('/2fa/challenge', [TwoFactorController::class, 'challenge'])->name('auth.2fa.challenge');
 });
+
+Route::get('/track/open/{token}.gif', [PublicTrackingController::class, 'open'])->name('track.open');
+Route::get('/track/click/{token}', [PublicTrackingController::class, 'click'])->name('track.click');
+Route::get('/unsubscribe/{token}', [PublicTrackingController::class, 'unsubscribe'])->name('track.unsubscribe');
+
+Route::prefix('api')->group(function (): void {
+    Route::get('/me', [AuthController::class, 'me'])->name('api.me');
+
+    Route::middleware('auth')->group(function (): void {
+        Route::get('/dashboard', [DashboardController::class, 'show'])->name('api.dashboard');
+
+        Route::get('/contacts/export', [ContactController::class, 'export'])->name('api.contacts.export');
+        Route::post('/contacts/import', [ContactController::class, 'import'])->name('api.contacts.import');
+        Route::apiResource('contacts', ContactController::class);
+
+        Route::get('/email-accounts/deliverability', [EmailAccountController::class, 'deliverability'])->name('api.email-accounts.deliverability');
+        Route::post('/email-accounts/{emailAccount}/test', [EmailAccountController::class, 'test'])->name('api.email-accounts.test');
+        Route::apiResource('email-accounts', EmailAccountController::class);
+
+        Route::post('/campaigns/{campaign}/launch', [CampaignController::class, 'launch'])->name('api.campaigns.launch');
+        Route::get('/campaigns/{campaign}/preview', [CampaignController::class, 'preview'])->name('api.campaigns.preview');
+        Route::apiResource('campaigns', CampaignController::class);
+
+        Route::get('/conversations', [ConversationController::class, 'index'])->name('api.conversations.index');
+        Route::get('/conversations/{thread}', [ConversationController::class, 'show'])->name('api.conversations.show');
+
+        Route::get('/analytics', [AnalyticsController::class, 'index'])->name('api.analytics.index');
+        Route::get('/analytics/export/csv', [AnalyticsController::class, 'exportCsv'])->name('api.analytics.export.csv');
+
+        Route::get('/notifications', [NotificationController::class, 'index'])->name('api.notifications.index');
+        Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('api.notifications.read');
+
+        Route::get('/2fa/setup', [TwoFactorController::class, 'setup'])->name('api.2fa.setup');
+        Route::post('/2fa/enable', [TwoFactorController::class, 'enable'])->name('api.2fa.enable');
+        Route::post('/2fa/disable', [TwoFactorController::class, 'disable'])->name('api.2fa.disable');
+
+        Route::middleware('role:admin')->prefix('admin')->group(function (): void {
+            Route::get('/summary', [AdminController::class, 'summary'])->name('api.admin.summary');
+            Route::get('/users', [AdminController::class, 'users'])->name('api.admin.users');
+            Route::put('/users/{user}', [AdminController::class, 'updateUser'])->name('api.admin.users.update');
+            Route::get('/settings', [AdminController::class, 'settings'])->name('api.admin.settings');
+            Route::put('/settings', [AdminController::class, 'updateSettings'])->name('api.admin.settings.update');
+        });
+    });
+});
+
+Route::get('/{any?}', SpaController::class)
+    ->where('any', '^(?!api|auth|track|unsubscribe|up).*$')
+    ->name('spa');

@@ -3,43 +3,32 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\WorkspaceNotification;
-use App\Support\WorkspacePresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\DatabaseNotification;
 
 class NotificationController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $notifications = WorkspaceNotification::query()
-            ->where('recipient_id', $request->user()->getKey())
-            ->latest()
-            ->take(50)
-            ->get();
-
         return response()->json([
-            'notifications' => $notifications->map(fn (WorkspaceNotification $notification) => WorkspacePresenter::notification($notification))->all(),
+            'data' => $request->user()->notifications()->latest()->take(25)->get()->map(fn (DatabaseNotification $notification) => [
+                'id' => $notification->id,
+                'read_at' => $notification->read_at?->toIso8601String(),
+                'title' => $notification->data['title'] ?? 'Notification',
+                'message' => $notification->data['message'] ?? '',
+                'level' => $notification->data['level'] ?? 'info',
+                'meta' => $notification->data['meta'] ?? [],
+                'created_at' => $notification->created_at?->toIso8601String(),
+            ])->all(),
         ]);
     }
 
-    public function markRead(Request $request, WorkspaceNotification $notification): JsonResponse
+    public function markRead(Request $request, DatabaseNotification $notification): JsonResponse
     {
-        abort_unless((string) $notification->recipient_id === (string) $request->user()->getKey(), 404, 'Notification not found');
-        $notification->update(['read_at' => now()]);
+        abort_unless($notification->notifiable_id === $request->user()->id, 404);
+        $notification->markAsRead();
 
-        return response()->json([
-            'notification' => WorkspacePresenter::notification($notification->fresh()),
-        ]);
-    }
-
-    public function markAllRead(Request $request): JsonResponse
-    {
-        WorkspaceNotification::query()
-            ->where('recipient_id', $request->user()->getKey())
-            ->whereNull('read_at')
-            ->update(['read_at' => now()]);
-
-        return response()->json([], 204);
+        return response()->json(['status' => 'read']);
     }
 }

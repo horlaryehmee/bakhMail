@@ -25,10 +25,13 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->name(),
-            'email' => fake()->unique()->safeEmail(),
+            'name' => $this->faker->name(),
+            'email' => $this->faker->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
+            'role' => User::ROLE_STANDARD,
+            'timezone' => $this->faker->timezone(),
+            'avatar_color' => $this->faker->randomElement(['#60a5fa', '#34d399', '#f97316', '#c084fc']),
             'remember_token' => Str::random(10),
         ];
     }
@@ -40,6 +43,13 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    public function admin(): static
+    {
+        return $this->state(fn () => [
+            'role' => User::ROLE_ADMIN,
         ]);
     }
 }
