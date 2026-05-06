@@ -45,7 +45,7 @@ class InstallationService
             'APP_DEBUG' => false,
             'APP_URL' => $payload['app_url'],
             'APP_KEY' => $appKey,
-            'APP_INSTALLED' => true,
+            'APP_INSTALLED' => false,
             'DB_CONNECTION' => 'mysql',
             'DB_HOST' => $payload['db_host'],
             'DB_PORT' => (string) $payload['db_port'],
@@ -85,6 +85,9 @@ class InstallationService
         InstallationState::markInstalled([
             'app_name' => $payload['app_name'],
             'admin_email' => strtolower($payload['admin_email']),
+        ]);
+        EnvironmentFile::write([
+            'APP_INSTALLED' => true,
         ]);
 
         return [
@@ -189,8 +192,8 @@ class InstallationService
         ], [
             'name' => $payload['admin_name'],
             'password' => $payload['admin_password'],
-            'role' => 'master_admin',
-            'title' => 'Master Admin',
+            'role' => User::ROLE_ADMIN,
+            'title' => 'Admin',
             'notification_preferences' => WorkspacePresenter::defaultNotificationPreferences(),
             'is_active' => true,
             'demo_data' => false,
