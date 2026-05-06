@@ -11,10 +11,15 @@ use App\Http\Controllers\Api\GroqController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\TwoFactorController;
+use App\Http\Controllers\InstallController;
 use App\Http\Controllers\PublicTrackingController;
 use App\Http\Controllers\SpaController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/install', [InstallController::class, 'show'])->name('install.show');
+Route::post('/install', [InstallController::class, 'install'])->name('install.run');
+
+Route::middleware('installed')->group(function (): void {
 Route::prefix('auth')->group(function (): void {
     Route::post('/register', [AuthController::class, 'register'])->name('auth.register');
     Route::post('/login', [AuthController::class, 'login'])->name('auth.login');
@@ -77,3 +82,4 @@ Route::prefix('api')->group(function (): void {
 Route::get('/{any?}', SpaController::class)
     ->where('any', '^(?!api|auth|track|unsubscribe|up).*$')
     ->name('spa');
+});
