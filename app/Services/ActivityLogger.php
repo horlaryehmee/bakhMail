@@ -6,6 +6,7 @@ use App\Models\ActivityLog;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Throwable;
 
 class ActivityLogger
 {
@@ -17,7 +18,7 @@ class ActivityLogger
         array $properties = [],
         ?string $description = null,
     ): ActivityLog {
-        return ActivityLog::create([
+        $payload = [
             'user_id' => $user?->id,
             'action' => $action,
             'subject_type' => $subject instanceof Model ? $subject::class : (is_string($subject) ? $subject : null),
@@ -26,6 +27,12 @@ class ActivityLogger
             'properties' => $properties,
             'ip_address' => $request?->ip(),
             'user_agent' => $request?->userAgent(),
-        ]);
+        ];
+
+        try {
+            return ActivityLog::create($payload);
+        } catch (Throwable) {
+            return new ActivityLog($payload);
+        }
     }
 }

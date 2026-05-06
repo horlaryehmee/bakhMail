@@ -7,11 +7,26 @@ use App\Models\Campaign;
 use App\Models\EmailLog;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Schema;
 
 class AnalyticsService
 {
     public function summaryForUser(User $user): array
     {
+        if (! Schema::hasTable('email_logs')) {
+            return [
+                'totals' => [
+                    'sent' => 0,
+                    'delivery_rate' => 0,
+                    'open_rate' => 0,
+                    'click_rate' => 0,
+                    'reply_rate' => 0,
+                ],
+                'timeline' => [],
+                'campaigns' => [],
+            ];
+        }
+
         $outboundLogs = EmailLog::query()
             ->where('user_id', $user->id)
             ->where('direction', 'outbound');
@@ -37,6 +52,10 @@ class AnalyticsService
 
     public function campaignPerformance(User $user): array
     {
+        if (! Schema::hasTable('campaigns') || ! Schema::hasTable('email_logs')) {
+            return [];
+        }
+
         return Campaign::query()
             ->where('user_id', $user->id)
             ->withCount([
@@ -61,6 +80,10 @@ class AnalyticsService
 
     public function timelineForUser(User $user, int $days = 14): array
     {
+        if (! Schema::hasTable('email_logs')) {
+            return [];
+        }
+
         return collect(range($days - 1, 0))
             ->map(function (int $offset) use ($user): array {
                 $date = Carbon::today()->subDays($offset);
@@ -81,6 +104,10 @@ class AnalyticsService
 
     public function refreshCampaign(Campaign $campaign): void
     {
+        if (! Schema::hasTable('analytics_snapshots') || ! Schema::hasTable('email_logs')) {
+            return;
+        }
+
         $sent = $campaign->emailLogs()->where('event_type', 'sent')->count();
         $opened = $campaign->emailLogs()->whereNotNull('opened_at')->count();
         $clicked = $campaign->emailLogs()->whereNotNull('clicked_at')->count();
