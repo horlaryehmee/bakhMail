@@ -23,9 +23,9 @@ BakhMail is a Laravel + React bulk cold email SaaS starter focused on profession
 - PHP 8.3+
 - Composer
 - MySQL 8+
-- Redis
 - Node.js 20+ / npm
 - PHP `ext-imap`
+- Redis is optional; the default `.env.example` now boots with database-backed sessions, cache, and queue so first deployment only needs database credentials
 
 ## Setup
 
@@ -70,6 +70,70 @@ For local frontend hot reload instead of a production build:
 
 ```bash
 npm run dev
+```
+
+## Production Startup
+
+If you are preparing the app for a live server and you want it to bootstrap itself after you enter the database credentials:
+
+1. Install dependencies and build assets:
+
+```bash
+composer install --no-dev --optimize-autoloader
+npm install
+npm run build
+```
+
+2. Create `.env` from `.env.example` and set at minimum:
+
+```env
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://your-domain.com
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=your_database
+DB_USERNAME=your_user
+DB_PASSWORD=your_password
+
+SETUP_ADMIN_NAME=Admin User
+SETUP_ADMIN_EMAIL=admin@your-domain.com
+SETUP_ADMIN_PASSWORD=change-this-password
+```
+
+3. Run the startup command:
+
+```bash
+php artisan bakhmail:setup --force
+```
+
+What it does:
+
+- generates `APP_KEY` if missing
+- runs database migrations
+- creates the `public/storage` symlink if needed
+- syncs default app settings into `app_settings`
+- creates or updates the admin user from `SETUP_ADMIN_*`
+- warms Laravel caches unless skipped
+
+Optional wrappers:
+
+```bash
+sh scripts/setup-production.sh
+```
+
+On Windows PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup-production.ps1
+```
+
+If you want demo users on a non-production install:
+
+```bash
+php artisan bakhmail:setup --force --seed-demo
 ```
 
 ## Seeded Users

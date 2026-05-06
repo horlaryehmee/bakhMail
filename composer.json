@@ -36,10 +36,12 @@
         "setup": [
             "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
-            "@php artisan key:generate",
-            "@php artisan migrate --force",
             "npm install",
-            "npm run build"
+            "npm run build",
+            "@php artisan bakhmail:setup --force"
+        ],
+        "deploy": [
+            "@php artisan bakhmail:setup --force"
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",

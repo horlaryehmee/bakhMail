@@ -25,6 +25,7 @@ Recent work completed in this workspace:
 - adjusted sidebar behavior so larger screens use a pinned sidebar earlier
 - improved 2FA disable handling and surfaced validation errors in the UI
 - integrated Groq AI via a minimal OpenAI-compatible responses flow, encrypted admin API-key storage, an admin-side test console, and local daily token/request usage tracking
+- added a production-ready startup/setup command so the app can self-bootstrap after environment and database details are configured
 
 Known current expectation:
 
@@ -253,6 +254,7 @@ Implemented:
 - Groq responses test endpoint
 - Groq local daily request/token usage tracking
 - Groq daily limit visibility with admin override support
+- production setup command and scripts for first boot
 
 Relevant backend:
 
@@ -261,8 +263,10 @@ Relevant backend:
 - `app/Http/Middleware/EnsureRole.php`
 - `app/Models/AppSetting.php`
 - `app/Models/GroqUsageLog.php`
+- `app/Console/Commands/SetupApplication.php`
 - `app/Services/GroqService.php`
 - `database/migrations/2026_05_06_180000_create_groq_usage_logs_table.php`
+- `database/migrations/2026_05_06_220000_create_sessions_table.php`
 
 Relevant frontend:
 
@@ -425,6 +429,12 @@ php artisan serve --host=127.0.0.1 --port=8000
 npm.cmd run build
 ```
 
+Production-first startup command:
+
+```bash
+php artisan bakhmail:setup --force
+```
+
 Optional dev asset flow:
 
 ```bash
@@ -451,6 +461,12 @@ Groq configuration behavior:
 - if no Groq model override is set, the app uses `llama-3.1-8b-instant`
 - Groq headers expose requests-per-day and tokens-per-minute data
 - the app separately stores Groq usage locally so Admin can show today’s token usage and a calculated remaining daily budget
+
+Production startup behavior:
+
+- `.env.example` now defaults to database-backed sessions, cache, and queue so first deployment only needs valid database credentials
+- `bakhmail:setup` generates the app key if missing, runs migrations, creates the storage symlink, seeds core app settings, creates or updates the admin user from `SETUP_ADMIN_*`, and warms Laravel caches
+- wrapper scripts exist at `scripts/setup-production.sh` and `scripts/setup-production.ps1`
 
 ## Database Notes
 
