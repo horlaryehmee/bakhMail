@@ -3,18 +3,22 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AppSetting;
 use App\Models\Campaign;
 use App\Models\Contact;
 use App\Services\ActivityLogger;
 use App\Services\CampaignOrchestrator;
+use App\Services\GroqService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use RuntimeException;
 
 class CampaignController extends Controller
 {
     public function __construct(
         private readonly CampaignOrchestrator $orchestrator,
         private readonly ActivityLogger $activityLogger,
+        private readonly GroqService $groqService,
     ) {
     }
 
@@ -101,6 +105,70 @@ class CampaignController extends Controller
         ]);
     }
 
+    public function generate(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'brief' => ['required', 'string', 'min:10', 'max:4000'],
+            'campaign_name' => ['nullable', 'string', 'max:255'],
+            'subject' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $model = $this->groqService->resolveResponseModel($this->setting('groq_response_model'));
+        $result = $this->groqService->createResponse(
+            $this->campaignGenerationPrompt($validated),
+            $model,
+            ['temperature' => 0.8],
+            $request->user(),
+        );
+
+        try {
+            $draft = $this->normalizeGeneratedDraft($this->extractJsonPayload($result['output_text'] ?? ''));
+        } catch (\Throwable) {
+            throw new RuntimeException('The AI response could not be turned into a campaign draft. Try again with a more specific brief.');
+        }
+
+        return response()->json([
+            'data' => [
+                'draft' => $draft,
+                'model' => $result['model'] ?? $model,
+                'usage' => $result['usage'] ?? null,
+            ],
+        ]);
+    }
+
+    public function assistDetails(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'brief' => ['nullable', 'string', 'max:4000'],
+            'campaign_name' => ['nullable', 'string', 'max:255'],
+            'subject' => ['nullable', 'string', 'max:255'],
+            'preview_text' => ['nullable', 'string', 'max:255'],
+            'builder_text' => ['nullable', 'string', 'max:8000'],
+        ]);
+
+        $model = $this->groqService->resolveResponseModel($this->setting('groq_response_model'));
+        $result = $this->groqService->createResponse(
+            $this->campaignDetailsAssistPrompt($validated),
+            $model,
+            ['temperature' => 0.7],
+            $request->user(),
+        );
+
+        try {
+            $details = $this->normalizeDetailsAssist($this->extractJsonPayload($result['output_text'] ?? ''));
+        } catch (\Throwable) {
+            throw new RuntimeException('The AI response could not be turned into campaign detail suggestions. Try again with a clearer brief.');
+        }
+
+        return response()->json([
+            'data' => [
+                'details' => $details,
+                'model' => $result['model'] ?? $model,
+                'usage' => $result['usage'] ?? null,
+            ],
+        ]);
+    }
+
     private function validatePayload(Request $request): array
     {
         return $request->validate([
@@ -184,5 +252,219 @@ class CampaignController extends Controller
         }
 
         return $payload;
+    }
+
+    private function setting(string $key): mixed
+    {
+        return AppSetting::query()->where('key', $key)->first()?->value;
+    }
+
+    private function campaignGenerationPrompt(array $validated): string
+    {
+        $campaignName = $validated['campaign_name'] ?? '';
+        $subject = $validated['subject'] ?? '';
+        $brief = $validated['brief'];
+
+        return <<<PROMPT
+You are generating a B2B email campaign draft for a visual campaign builder.
+
+Return valid JSON only. No markdown fences. No explanation.
+
+JSON shape:
+{
+  "name": "string",
+  "subject": "string",
+  "preview_text": "string",
+  "builder_blocks": [
+    {
+      "type": "image|text|button|divider"
+    }
+  ],
+  "steps": [
+    {
+      "name": "string",
+      "subject": "string",
+      "delay_hours": 0,
+      "body_html": "<p>...</p>"
+    }
+  ]
+}
+
+Rules:
+- Tone should be modern, credible, concise, and human.
+- Use placeholders like {{first_name}} and {{company}} when useful.
+- Include at least one text block and one button block.
+- Image URLs should come from https://images.unsplash.com
+- text block fields: type, content, align, color, fontSize, paddingTop, paddingBottom
+- image block fields: type, src, alt, paddingTop, paddingBottom
+- button block fields: type, label, href, align, backgroundColor, textColor, paddingTop, paddingBottom
+- divider block fields: type, color, paddingTop, paddingBottom
+- Produce 2 or 3 sequence steps.
+- step body_html must be simple valid email HTML.
+
+Current campaign hints:
+- campaign_name: {$campaignName}
+- subject: {$subject}
+
+User brief:
+{$brief}
+PROMPT;
+    }
+
+    private function campaignDetailsAssistPrompt(array $validated): string
+    {
+        $campaignName = $validated['campaign_name'] ?? '';
+        $subject = $validated['subject'] ?? '';
+        $previewText = $validated['preview_text'] ?? '';
+        $brief = $validated['brief'] ?? '';
+        $builderText = $validated['builder_text'] ?? '';
+
+        return <<<PROMPT
+You are helping finalize the settings and scheduling step of a B2B outreach campaign builder.
+
+Return valid JSON only. No markdown fences. No commentary.
+
+JSON shape:
+{
+  "campaign_name": "string",
+  "subject": "string",
+  "preview_text": "string",
+  "audience_strategy": "short recommendation",
+  "send_strategy": "short recommendation",
+  "quality_note": "short quality note"
+}
+
+Rules:
+- Keep subject under 60 characters.
+- Keep preview_text under 120 characters.
+- Make the output practical and easy to apply.
+- The copy should fit a credible B2B outbound campaign.
+- Use the current email draft and brief as context.
+
+Current inputs:
+- campaign_name: {$campaignName}
+- subject: {$subject}
+- preview_text: {$previewText}
+- email draft text: {$builderText}
+- user brief: {$brief}
+PROMPT;
+    }
+
+    private function extractJsonPayload(string $output): array
+    {
+        $output = trim($output);
+        $decoded = json_decode($output, true);
+
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        $start = strpos($output, '{');
+        $end = strrpos($output, '}');
+
+        if ($start === false || $end === false || $end <= $start) {
+            throw new RuntimeException('No JSON object was returned.');
+        }
+
+        $decoded = json_decode(substr($output, $start, $end - $start + 1), true);
+
+        if (! is_array($decoded)) {
+            throw new RuntimeException('Invalid JSON returned.');
+        }
+
+        return $decoded;
+    }
+
+    private function normalizeGeneratedDraft(array $draft): array
+    {
+        $blocks = collect($draft['builder_blocks'] ?? [])
+            ->map(function ($block, $index) {
+                $type = $block['type'] ?? 'text';
+                $base = [
+                    'id' => "ai-block-{$index}-".substr(md5(json_encode($block)), 0, 10),
+                    'type' => $type,
+                    'paddingTop' => (int) ($block['paddingTop'] ?? 12),
+                    'paddingBottom' => (int) ($block['paddingBottom'] ?? 12),
+                ];
+
+                return match ($type) {
+                    'image' => [
+                        ...$base,
+                        'src' => (string) ($block['src'] ?? 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80'),
+                        'alt' => (string) ($block['alt'] ?? 'Campaign image'),
+                    ],
+                    'button' => [
+                        ...$base,
+                        'label' => (string) ($block['label'] ?? 'Learn more'),
+                        'href' => (string) ($block['href'] ?? 'https://example.com'),
+                        'align' => $this->normalizeAlign($block['align'] ?? 'left'),
+                        'backgroundColor' => (string) ($block['backgroundColor'] ?? '#171411'),
+                        'textColor' => (string) ($block['textColor'] ?? '#fffaf3'),
+                    ],
+                    'divider' => [
+                        ...$base,
+                        'color' => (string) ($block['color'] ?? '#ddd3c4'),
+                    ],
+                    default => [
+                        ...$base,
+                        'content' => (string) ($block['content'] ?? 'Generated campaign copy.'),
+                        'align' => $this->normalizeAlign($block['align'] ?? 'left'),
+                        'color' => (string) ($block['color'] ?? '#201a16'),
+                        'fontSize' => (int) ($block['fontSize'] ?? 17),
+                    ],
+                };
+            })
+            ->values()
+            ->all();
+
+        if ($blocks === []) {
+            $blocks = [[
+                'id' => 'ai-block-fallback',
+                'type' => 'text',
+                'content' => 'Generated campaign copy.',
+                'align' => 'left',
+                'color' => '#201a16',
+                'fontSize' => 17,
+                'paddingTop' => 16,
+                'paddingBottom' => 16,
+            ]];
+        }
+
+        $steps = collect($draft['steps'] ?? [])
+            ->map(fn ($step, $index) => [
+                'id' => "ai-step-{$index}",
+                'name' => (string) ($step['name'] ?? 'Follow-up '.($index + 1)),
+                'subject' => (string) ($step['subject'] ?? ($draft['subject'] ?? 'Quick question')),
+                'delay_hours' => (int) ($step['delay_hours'] ?? ($index === 0 ? 0 : 48)),
+                'body_html' => (string) ($step['body_html'] ?? '<p>Hi {{first_name}},</p><p>Following up on my earlier note.</p>'),
+            ])
+            ->take(3)
+            ->values()
+            ->all();
+
+        return [
+            'name' => (string) ($draft['name'] ?? 'AI campaign draft'),
+            'subject' => (string) ($draft['subject'] ?? 'Quick question for {{company}}'),
+            'preview_text' => (string) ($draft['preview_text'] ?? ''),
+            'builder_blocks' => $blocks,
+            'steps' => $steps,
+        ];
+    }
+
+    private function normalizeDetailsAssist(array $details): array
+    {
+        return [
+            'campaign_name' => mb_substr((string) ($details['campaign_name'] ?? ''), 0, 255),
+            'subject' => mb_substr((string) ($details['subject'] ?? ''), 0, 255),
+            'preview_text' => mb_substr((string) ($details['preview_text'] ?? ''), 0, 255),
+            'audience_strategy' => mb_substr((string) ($details['audience_strategy'] ?? ''), 0, 400),
+            'send_strategy' => mb_substr((string) ($details['send_strategy'] ?? ''), 0, 400),
+            'quality_note' => mb_substr((string) ($details['quality_note'] ?? ''), 0, 400),
+        ];
+    }
+
+    private function normalizeAlign(mixed $align): string
+    {
+        return in_array($align, ['left', 'center', 'right'], true) ? $align : 'left';
     }
 }

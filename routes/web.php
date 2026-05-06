@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EmailAccountController;
+use App\Http\Controllers\Api\GroqController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\TwoFactorController;
@@ -41,6 +42,8 @@ Route::prefix('api')->group(function (): void {
         Route::post('/email-accounts/{emailAccount}/test', [EmailAccountController::class, 'test'])->name('api.email-accounts.test');
         Route::apiResource('email-accounts', EmailAccountController::class);
 
+        Route::post('/campaigns/generate', [CampaignController::class, 'generate'])->name('api.campaigns.generate');
+        Route::post('/campaigns/assist-details', [CampaignController::class, 'assistDetails'])->name('api.campaigns.assist-details');
         Route::post('/campaigns/{campaign}/launch', [CampaignController::class, 'launch'])->name('api.campaigns.launch');
         Route::get('/campaigns/{campaign}/preview', [CampaignController::class, 'preview'])->name('api.campaigns.preview');
         Route::apiResource('campaigns', CampaignController::class);
@@ -64,6 +67,9 @@ Route::prefix('api')->group(function (): void {
             Route::put('/users/{user}', [AdminController::class, 'updateUser'])->name('api.admin.users.update');
             Route::get('/settings', [AdminController::class, 'settings'])->name('api.admin.settings');
             Route::put('/settings', [AdminController::class, 'updateSettings'])->name('api.admin.settings.update');
+            Route::get('/groq/status', [GroqController::class, 'status'])->name('api.admin.groq.status');
+            Route::get('/groq/models', [GroqController::class, 'models'])->name('api.admin.groq.models');
+            Route::post('/groq/responses', [GroqController::class, 'responses'])->name('api.admin.groq.responses');
         });
     });
 });

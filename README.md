@@ -10,6 +10,7 @@ BakhMail is a Laravel + React bulk cold email SaaS starter focused on profession
 - Redis-backed queue jobs for scheduled sending, retries, reply sync, and warm-up automation
 - Tracking for opens, clicks, replies, bounces, unsubscribes, and campaign-level analytics
 - Admin controls, global settings, and user activity logging
+- Admin-side Groq AI integration for OpenAI-compatible responses testing
 - Glossy React dashboard UI with charts, modals, responsive tables, and mobile layout support
 
 ## Stack
@@ -42,6 +43,7 @@ php artisan key:generate
 ```
 
 3. Update `.env` for MySQL, Redis, mail, and tracking domain values.
+   Groq can be configured either from the admin settings UI or via `GROQ_API_KEY`.
 
 4. Run migrations and seed the starter users:
 

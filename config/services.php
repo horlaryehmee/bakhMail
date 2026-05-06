@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'groq' => [
+        'api_key' => env('GROQ_API_KEY'),
+        'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com'),
+        'default_chat_model' => env('GROQ_DEFAULT_CHAT_MODEL', 'llama-3.3-70b-versatile'),
+        'default_response_model' => env('GROQ_DEFAULT_RESPONSE_MODEL', 'llama-3.1-8b-instant'),
+    ],
+
 ];

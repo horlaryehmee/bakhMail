@@ -24,6 +24,7 @@ Recent work completed in this workspace:
 - fixed a runtime shell crash caused by a derived value being evaluated before `links` existed
 - adjusted sidebar behavior so larger screens use a pinned sidebar earlier
 - improved 2FA disable handling and surfaced validation errors in the UI
+- integrated Groq AI via a minimal OpenAI-compatible responses flow, encrypted admin API-key storage, an admin-side test console, and local daily token/request usage tracking
 
 Known current expectation:
 
@@ -247,12 +248,21 @@ Implemented:
 - user update endpoint
 - admin settings retrieval
 - admin settings update
+- Groq configuration status endpoint
+- Groq admin-managed API key storage
+- Groq responses test endpoint
+- Groq local daily request/token usage tracking
+- Groq daily limit visibility with admin override support
 
 Relevant backend:
 
 - `app/Http/Controllers/Api/AdminController.php`
+- `app/Http/Controllers/Api/GroqController.php`
 - `app/Http/Middleware/EnsureRole.php`
 - `app/Models/AppSetting.php`
+- `app/Models/GroqUsageLog.php`
+- `app/Services/GroqService.php`
+- `database/migrations/2026_05_06_180000_create_groq_usage_logs_table.php`
 
 Relevant frontend:
 
@@ -335,6 +345,7 @@ Important directories:
 - `ContactImportService.php`: CSV ingestion and contact import logic
 - `DeliverabilityService.php`: deliverability checks / account status helpers
 - `DynamicSmtpMailer.php`: runtime SMTP sending path
+- `GroqService.php`: OpenAI-compatible Groq client wrapper for the Responses API with automatic available-model selection
 - `PlaceholderService.php`: contact/campaign token replacement
 - `ReplySyncService.php`: reply and bounce synchronization behavior
 - `TrackingService.php`: open/click/unsubscribe event handling
@@ -389,6 +400,8 @@ Authenticated API groups:
 - `/api/notifications/*`
 - `/api/2fa/*`
 - `/api/admin/*` for admins only
+- `/api/admin/groq/status`
+- `/api/admin/groq/responses`
 
 SPA shell:
 
@@ -422,6 +435,22 @@ Seeded users:
 
 - `admin@bakhmail.test` / `password`
 - `hello@bakhmail.test` / `password`
+
+Groq environment variables:
+
+- `GROQ_API_KEY`
+- `GROQ_BASE_URL`
+- `GROQ_DEFAULT_CHAT_MODEL`
+- `GROQ_DEFAULT_RESPONSE_MODEL`
+
+Groq configuration behavior:
+
+- admin-saved `groq_api_key` is preferred when present
+- env `GROQ_API_KEY` is used as fallback
+- the admin UI never reads back the stored key value directly
+- if no Groq model override is set, the app uses `llama-3.1-8b-instant`
+- Groq headers expose requests-per-day and tokens-per-minute data
+- the app separately stores Groq usage locally so Admin can show today’s token usage and a calculated remaining daily budget
 
 ## Database Notes
 
@@ -492,4 +521,3 @@ Minimum update expectation after future work:
 - update `Current Status`
 - update the relevant capability section
 - add or remove a note in `Known Gaps and Follow-up Areas`
-
