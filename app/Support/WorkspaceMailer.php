@@ -318,7 +318,7 @@ class WorkspaceMailer
         }
 
         return [
-            'brandName' => (string) ($brandingPayload['brandName'] ?? config('app.name', 'TaskManager')),
+            'brandName' => (string) ($brandingPayload['brandName'] ?? config('app.name', 'BakhMail')),
             'logoUrl' => $logoUrl,
             'logoVersion' => $logoVersion,
             'appUrl' => $appUrl,

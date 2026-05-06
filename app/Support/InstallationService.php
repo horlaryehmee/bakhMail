@@ -208,7 +208,7 @@ class InstallationService
         BrandingSetting::query()->updateOrCreate([
             'key' => 'branding',
         ], [
-            'brand_name' => trim($payload['app_name']) ?: 'TaskManager',
+            'brand_name' => trim($payload['app_name']) ?: 'BakhMail',
             'logo_url' => '',
             'logo_size' => 1,
         ]);

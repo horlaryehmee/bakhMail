@@ -1,5 +1,5 @@
 @php
-    $brandName = $branding['brandName'] ?? config('app.name', 'TaskManager');
+    $brandName = $branding['brandName'] ?? config('app.name', 'BakhMail');
     $logoUrl = $branding['logoUrl'] ?? '';
     $appUrl = $branding['appUrl'] ?? config('app.url');
     $eyebrow = $messageData['eyebrow'] ?? 'Workspace update';

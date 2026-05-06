@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ ($completed ?? false) ? 'Installation Complete' : 'Install TaskManager' }}</title>
+    <title>{{ ($completed ?? false) ? 'Installation Complete' : 'Install BakhMail' }}</title>
     <style>
         :root {
             color-scheme: dark;
@@ -199,7 +199,7 @@
     <div class="shell">
         <div class="header">
             <p class="eyebrow">Installer</p>
-            <h1>{{ ($completed ?? false) ? 'TaskManager is ready.' : 'Set up TaskManager in one pass.' }}</h1>
+            <h1>{{ ($completed ?? false) ? 'BakhMail is ready.' : 'Set up BakhMail in one pass.' }}</h1>
             <p class="subtle">
                 {{ ($completed ?? false)
                     ? 'The database tables, branding defaults, and your first Master Admin account are in place. You can sign in immediately.'
@@ -226,7 +226,7 @@
                 </div>
                 <div class="actions">
                     <span class="meta">Next step: open the app and sign in with the credentials above.</span>
-                    <a class="button" href="{{ url('/') }}">Open TaskManager</a>
+                    <a class="button" href="{{ url('/') }}">Open BakhMail</a>
                 </div>
             </div>
         @else
@@ -337,14 +337,14 @@
                                 </div>
                                 <div>
                                     <label for="mail_from_name">From name</label>
-                                    <input id="mail_from_name" name="mail_from_name" value="{{ $defaults['mail_from_name'] }}" placeholder="TaskManager">
+                                    <input id="mail_from_name" name="mail_from_name" value="{{ $defaults['mail_from_name'] }}" placeholder="BakhMail">
                                 </div>
                             </div>
                         </div>
 
                         <div class="actions">
                             <span class="meta">The database must already exist. SMTP details are optional during install, but required if you want real email notifications instead of logged mail. Use <strong>smtp</strong> for port 587 and <strong>smtps</strong> for port 465.</span>
-                            <button class="button" type="submit">Install TaskManager</button>
+                            <button class="button" type="submit">Install BakhMail</button>
                         </div>
                     </form>
                 </div>

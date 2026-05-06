@@ -15,12 +15,12 @@ class InstallController extends Controller
     public function show(Request $request): View|RedirectResponse
     {
         if (InstallationState::isInstalled()) {
-            return redirect()->route('workspace');
+            return redirect()->to('/');
         }
 
         return view('install', [
             'defaults' => [
-                'app_name' => config('app.name', 'TaskManager'),
+                'app_name' => config('app.name', 'BakhMail'),
                 'app_url' => $request->root(),
                 'db_host' => old('db_host', 'localhost'),
                 'db_port' => old('db_port', '3306'),
@@ -31,7 +31,7 @@ class InstallController extends Controller
                 'mail_port' => old('mail_port', '587'),
                 'mail_user' => old('mail_user', ''),
                 'mail_from_address' => old('mail_from_address', ''),
-                'mail_from_name' => old('mail_from_name', config('app.name', 'TaskManager')),
+                'mail_from_name' => old('mail_from_name', config('app.name', 'BakhMail')),
                 'admin_name' => old('admin_name', ''),
                 'admin_email' => old('admin_email', ''),
             ],
@@ -42,7 +42,7 @@ class InstallController extends Controller
     public function install(Request $request, InstallationService $installer): View|RedirectResponse
     {
         if (InstallationState::isInstalled()) {
-            return redirect()->route('workspace');
+            return redirect()->to('/');
         }
 
         $payload = $request->validate([

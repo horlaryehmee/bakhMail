@@ -1,5 +1,5 @@
 @php
-    $brandName = $branding['brandName'] ?? config('app.name', 'TaskManager');
+    $brandName = $branding['brandName'] ?? config('app.name', 'BakhMail');
     $headline = $messageData['headline'] ?? ($messageData['subject'] ?? $brandName);
     $subject = $messageData['subject'] ?? $headline;
     $actionUrl = $messageData['actionUrl'] ?? ($branding['appUrl'] ?? config('app.url'));
