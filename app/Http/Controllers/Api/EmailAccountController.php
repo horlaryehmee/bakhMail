@@ -27,7 +27,13 @@ class EmailAccountController extends Controller
     {
         $this->ensureSchemaReady();
 
-        $accounts = $request->user()->emailAccounts()->withCount(['emailLogs as sent_count' => fn ($query) => $query->where('event_type', 'sent')])->latest()->get();
+        $accountsQuery = $request->user()->emailAccounts()->latest();
+
+        if (Schema::hasTable('email_logs')) {
+            $accountsQuery->withCount(['emailLogs as sent_count' => fn ($query) => $query->where('event_type', 'sent')]);
+        }
+
+        $accounts = $accountsQuery->get();
 
         return response()->json([
             'data' => $accounts->map(fn (EmailAccount $account) => $this->serializeAccount($account))->all(),
@@ -53,7 +59,11 @@ class EmailAccountController extends Controller
         $emailAccount = EmailAccount::query()->findOrFail($emailAccount);
         abort_unless($emailAccount->user_id === $request->user()->id, 404);
 
-        return response()->json(['data' => $this->serializeAccount($emailAccount->loadCount(['emailLogs as sent_count' => fn ($query) => $query->where('event_type', 'sent')]))]);
+        if (Schema::hasTable('email_logs')) {
+            $emailAccount->loadCount(['emailLogs as sent_count' => fn ($query) => $query->where('event_type', 'sent')]);
+        }
+
+        return response()->json(['data' => $this->serializeAccount($emailAccount)]);
     }
 
     public function update(Request $request, int $emailAccount): JsonResponse
