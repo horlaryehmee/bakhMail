@@ -28,10 +28,18 @@ async function request(url, options = {}) {
 
   const response = await fetch(url, config);
   const text = await response.text();
-  const payload = text ? JSON.parse(text) : null;
+  let payload = null;
+
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = { message: text };
+    }
+  }
 
   if (!response.ok) {
-    const error = new Error(payload?.message || 'Request failed');
+    const error = new Error(payload?.message || response.statusText || 'Request failed');
     error.payload = payload;
     error.status = response.status;
     throw error;
