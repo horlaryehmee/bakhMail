@@ -38,7 +38,7 @@ export function AuthShell({ title, eyebrow, subtitle, children, footer }) {
           </div>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
-            {[ 
+            {[
               ['Operational clarity', 'Navigation, hierarchy, and actions are tuned for daily sending work instead of decorative dashboards.'],
               ['Sharper rhythm', 'Stronger typography and restrained color create a more credible product surface.'],
               ['Responsive by default', 'The same system holds together cleanly across phones, tablets, and desktop review sessions.'],

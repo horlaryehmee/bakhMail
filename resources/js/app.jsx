@@ -84,29 +84,27 @@ function App() {
           className: `toast-shell ${theme === 'dark' ? 'toast-shell--dark' : 'toast-shell--light'}`,
         }}
       />
-      <Suspense fallback={<div className="min-h-screen bg-transparent p-8 text-[var(--color-text-muted)]">Loading workspace...</div>}>
-        <Routes>
-          <Route path="/" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/2fa" element={<TwoFactorPage />} />
-          <Route element={<ProtectedLayout />}>
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/contacts" element={<ContactsPage />} />
-            <Route path="/accounts" element={<EmailAccountsPage />} />
-            <Route path="/campaigns" element={<CampaignsPage />} />
-            <Route path="/conversations" element={<ConversationsPage />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-          </Route>
-          <Route element={<AdminLayout />}>
-            <Route path="/admin" element={<AdminPage />} />
-          </Route>
-          <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
-        </Routes>
-      </Suspense>
+      <Routes>
+        <Route path="/" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/2fa" element={<TwoFactorPage />} />
+        <Route element={<ProtectedLayout />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/contacts" element={<ContactsPage />} />
+          <Route path="/accounts" element={<EmailAccountsPage />} />
+          <Route path="/campaigns" element={<CampaignsPage />} />
+          <Route path="/conversations" element={<ConversationsPage />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+        </Route>
+        <Route element={<AdminLayout />}>
+          <Route path="/admin" element={<AdminPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
+      </Routes>
     </>
   );
 }
