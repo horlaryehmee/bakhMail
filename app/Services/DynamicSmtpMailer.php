@@ -12,23 +12,11 @@ class DynamicSmtpMailer
 {
     public function send(EmailAccount $account, array $payload): array
     {
-        if (! $account->smtp_host || ! $account->smtp_port) {
+        $dsn = $this->resolveDsn($account);
+
+        if (! $dsn) {
             throw new RuntimeException('SMTP settings are incomplete for this account.');
         }
-
-        $authSegment = '';
-
-        if ($account->smtp_username) {
-            $authSegment = rawurlencode((string) $account->smtp_username);
-
-            if ($account->smtp_password) {
-                $authSegment .= ':'.rawurlencode((string) $account->smtp_password);
-            }
-
-            $authSegment .= '@';
-        }
-
-        $dsn = sprintf('smtp://%s%s:%s%s', $authSegment, $account->smtp_host, $account->smtp_port, $account->smtp_encryption ? '?encryption='.$account->smtp_encryption : '');
 
         $transport = Transport::fromDsn($dsn);
         $email = (new Email())
@@ -56,5 +44,36 @@ class DynamicSmtpMailer
         return [
             'message_id' => $sent->getMessageId(),
         ];
+    }
+
+    private function resolveDsn(EmailAccount $account): ?string
+    {
+        if ($account->provider === 'php_mail') {
+            return 'native://default';
+        }
+
+        if (! $account->smtp_host || ! $account->smtp_port) {
+            return null;
+        }
+
+        $authSegment = '';
+
+        if ($account->smtp_username) {
+            $authSegment = rawurlencode((string) $account->smtp_username);
+
+            if ($account->smtp_password) {
+                $authSegment .= ':'.rawurlencode((string) $account->smtp_password);
+            }
+
+            $authSegment .= '@';
+        }
+
+        return sprintf(
+            'smtp://%s%s:%s%s',
+            $authSegment,
+            $account->smtp_host,
+            $account->smtp_port,
+            $account->smtp_encryption ? '?encryption='.$account->smtp_encryption : ''
+        );
     }
 }

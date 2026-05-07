@@ -290,6 +290,7 @@ export function EmailAccountsPage() {
                 <option value="custom">Custom SMTP/IMAP</option>
                 <option value="gmail">Gmail</option>
                 <option value="outlook">Outlook</option>
+                <option value="php_mail">PHP Mail</option>
               </select>
             </label>
           </div>

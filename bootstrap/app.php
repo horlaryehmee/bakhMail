@@ -3,9 +3,14 @@
 use App\Http\Middleware\EnsureApplicationInstalled;
 use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\EnsureRole;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -22,5 +27,35 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (Throwable $exception, Request $request) {
+            if (! ($request->is('api/*') || $request->expectsJson())) {
+                return null;
+            }
+
+            if ($exception instanceof HttpResponseException) {
+                return $exception->getResponse();
+            }
+
+            if ($exception instanceof ValidationException) {
+                return response()->json([
+                    'message' => $exception->getMessage() ?: 'The given data was invalid.',
+                    'errors' => $exception->errors(),
+                ], $exception->status);
+            }
+
+            if ($exception instanceof AuthenticationException) {
+                return response()->json([
+                    'message' => 'Authentication required.',
+                ], 401);
+            }
+
+            $status = $exception instanceof HttpExceptionInterface ? $exception->getStatusCode() : 500;
+            $message = $status >= 500
+                ? (app()->hasDebugModeEnabled() ? $exception->getMessage() : 'Server error. Check logs and try again.')
+                : $exception->getMessage();
+
+            return response()->json([
+                'message' => $message ?: 'Request failed.',
+            ], $status);
+        });
     })->create();

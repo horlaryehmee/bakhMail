@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class EmailAccountController extends Controller
 {
@@ -135,12 +136,12 @@ class EmailAccountController extends Controller
 
     private function validatePayload(Request $request, ?int $ignoreId = null): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'from_name' => ['nullable', 'string', 'max:255'],
             'email_address' => ['required', 'email', Rule::unique('email_accounts', 'email_address')->ignore($ignoreId)->where(fn ($query) => $query->where('user_id', $request->user()->id))],
             'reply_to_address' => ['nullable', 'email'],
-            'provider' => ['nullable', 'string', 'max:50'],
+            'provider' => ['nullable', 'string', Rule::in(['custom', 'gmail', 'outlook', 'php_mail'])],
             'status' => ['nullable', 'string', 'max:50'],
             'smtp_host' => ['nullable', 'string', 'max:255'],
             'smtp_port' => ['nullable', 'integer'],
@@ -163,6 +164,16 @@ class EmailAccountController extends Controller
             'health_score' => ['nullable', 'integer', 'min:0', 'max:100'],
             'metadata' => ['nullable', 'array'],
         ]);
+
+        if (($validated['provider'] ?? 'custom') !== 'php_mail') {
+            if (blank($validated['smtp_host'] ?? null) || blank($validated['smtp_port'] ?? null)) {
+                throw ValidationException::withMessages([
+                    'smtp_host' => 'SMTP host and port are required unless the provider is PHP Mail.',
+                ]);
+            }
+        }
+
+        return $validated;
     }
 
     private function serializeAccount(EmailAccount $account): array
@@ -193,7 +204,7 @@ class EmailAccountController extends Controller
             'last_synced_at' => $account->last_synced_at?->toIso8601String(),
             'metadata' => $account->metadata ?? [],
             'sent_count' => $account->sent_count ?? 0,
-            'smtp_configured' => (bool) ($account->smtp_host && $account->smtp_port),
+            'smtp_configured' => $account->provider === 'php_mail' || (bool) ($account->smtp_host && $account->smtp_port),
             'imap_configured' => $account->hasImapConfiguration(),
         ];
     }
