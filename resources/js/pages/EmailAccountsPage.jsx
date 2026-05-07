@@ -50,7 +50,7 @@ export function EmailAccountsPage() {
   }
 
   useEffect(() => {
-    load().catch(() => toast.error('Could not load mailbox accounts'));
+    load().catch((error) => toast.error(error.payload?.message || error.message || 'Could not load mailbox accounts'));
   }, []);
 
   const warmupEnabled = useMemo(() => accounts.filter((account) => account.warmup_enabled).length, [accounts]);
@@ -82,7 +82,7 @@ export function EmailAccountsPage() {
       setEditingId(null);
       load();
     } catch (error) {
-      toast.error(error.payload?.message || 'Could not save mailbox');
+      toast.error(error.payload?.message || error.message || 'Could not save mailbox');
     }
   }
 
@@ -96,8 +96,8 @@ export function EmailAccountsPage() {
     try {
       await api.post(`/api/email-accounts/${accountId}/test`, {});
       toast.success('Test email sent');
-    } catch {
-      toast.error('SMTP test failed');
+    } catch (error) {
+      toast.error(error.payload?.message || error.message || 'SMTP test failed');
     }
   }
 
@@ -106,8 +106,8 @@ export function EmailAccountsPage() {
       await api.delete(`/api/email-accounts/${accountId}`);
       toast.success('Mailbox removed');
       load();
-    } catch {
-      toast.error('Could not remove mailbox');
+    } catch (error) {
+      toast.error(error.payload?.message || error.message || 'Could not remove mailbox');
     }
   }
 
