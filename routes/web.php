@@ -48,6 +48,10 @@ Route::prefix('api')->group(function (): void {
 
         Route::get('/email-accounts/deliverability', [EmailAccountController::class, 'deliverability'])->name('api.email-accounts.deliverability');
         Route::post('/email-accounts/{emailAccount}/test', [EmailAccountController::class, 'test'])->name('api.email-accounts.test');
+        Route::post('/email-accounts/connect', [EmailAccountController::class, 'connect'])->name('api.email-accounts.connect');
+        Route::post('/email-accounts/{emailAccount}/save', [EmailAccountController::class, 'save'])->name('api.email-accounts.save');
+        Route::post('/email-accounts/{emailAccount}/remove', [EmailAccountController::class, 'remove'])->name('api.email-accounts.remove');
+        Route::post('/email-accounts/{emailAccount}/test-connection', [EmailAccountController::class, 'testConnection'])->name('api.email-accounts.test-connection');
         Route::apiResource('email-accounts', EmailAccountController::class);
 
         Route::post('/campaigns/generate', [CampaignController::class, 'generate'])->name('api.campaigns.generate');

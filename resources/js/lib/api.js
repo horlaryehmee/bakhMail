@@ -28,13 +28,21 @@ async function request(url, options = {}) {
 
   const response = await fetch(url, config);
   const text = await response.text();
+  const contentType = response.headers.get('content-type') || '';
   let payload = null;
 
   if (text) {
     try {
       payload = JSON.parse(text);
     } catch {
-      payload = { message: text };
+      const looksLikeHtml = contentType.includes('text/html') || /^\s*</.test(text);
+      const message = looksLikeHtml
+        ? response.redirected
+          ? 'Your session expired. Sign in again and retry the mailbox action.'
+          : `Unexpected server response for ${method} ${url}.`
+        : text;
+
+      payload = { message };
     }
   }
 

@@ -7,11 +7,11 @@ use App\Models\EmailAccount;
 use App\Services\ActivityLogger;
 use App\Services\DeliverabilityService;
 use App\Services\DynamicSmtpMailer;
+use App\Support\EmailAccountSchemaManager;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -21,6 +21,7 @@ class EmailAccountController extends Controller
         private readonly DeliverabilityService $deliverabilityService,
         private readonly DynamicSmtpMailer $dynamicSmtpMailer,
         private readonly ActivityLogger $activityLogger,
+        private readonly EmailAccountSchemaManager $schemaManager,
     ) {
     }
 
@@ -53,12 +54,16 @@ class EmailAccountController extends Controller
         return response()->json(['data' => $this->serializeAccount($account)], 201);
     }
 
+    public function connect(Request $request): JsonResponse
+    {
+        return $this->store($request);
+    }
+
     public function show(Request $request, int $emailAccount): JsonResponse
     {
         $this->ensureSchemaReady();
 
-        $emailAccount = EmailAccount::query()->findOrFail($emailAccount);
-        abort_unless($emailAccount->user_id === $request->user()->id, 404);
+        $emailAccount = $this->resolveOwnedAccount($request, $emailAccount);
 
         if (Schema::hasTable('email_logs')) {
             $emailAccount->loadCount(['emailLogs as sent_count' => fn ($query) => $query->where('event_type', 'sent')]);
@@ -71,8 +76,7 @@ class EmailAccountController extends Controller
     {
         $this->ensureSchemaReady();
 
-        $emailAccount = EmailAccount::query()->findOrFail($emailAccount);
-        abort_unless($emailAccount->user_id === $request->user()->id, 404);
+        $emailAccount = $this->resolveOwnedAccount($request, $emailAccount);
         $validated = $this->validatePayload($request, $emailAccount->id);
 
         foreach (['smtp_password', 'imap_password', 'oauth_access_token', 'oauth_refresh_token'] as $secretField) {
@@ -88,18 +92,27 @@ class EmailAccountController extends Controller
         return response()->json(['data' => $this->serializeAccount($emailAccount)]);
     }
 
+    public function save(Request $request, int $emailAccount): JsonResponse
+    {
+        return $this->update($request, $emailAccount);
+    }
+
     public function destroy(Request $request, int $emailAccount): JsonResponse
     {
         $this->ensureSchemaReady();
 
-        $emailAccount = EmailAccount::query()->findOrFail($emailAccount);
-        abort_unless($emailAccount->user_id === $request->user()->id, 404);
+        $emailAccount = $this->resolveOwnedAccount($request, $emailAccount);
         $address = $emailAccount->email_address;
         $emailAccount->delete();
 
         $this->activityLogger->log($request->user(), 'accounts.deleted', EmailAccount::class, $request, ['email' => $address], "Deleted email account {$address}.");
 
         return response()->json(['status' => 'deleted']);
+    }
+
+    public function remove(Request $request, int $emailAccount): JsonResponse
+    {
+        return $this->destroy($request, $emailAccount);
     }
 
     public function deliverability(Request $request): JsonResponse
@@ -119,8 +132,7 @@ class EmailAccountController extends Controller
     {
         $this->ensureSchemaReady();
 
-        $emailAccount = EmailAccount::query()->findOrFail($emailAccount);
-        abort_unless($emailAccount->user_id === $request->user()->id, 404);
+        $emailAccount = $this->resolveOwnedAccount($request, $emailAccount);
 
         $validated = $request->validate([
             'to_email' => ['nullable', 'email'],
@@ -143,6 +155,11 @@ class EmailAccountController extends Controller
             'status' => 'sent',
             'message_id' => $result['message_id'] ?? null,
         ]);
+    }
+
+    public function testConnection(Request $request, int $emailAccount): JsonResponse
+    {
+        return $this->test($request, $emailAccount);
     }
 
     private function validatePayload(Request $request, ?int $ignoreId = null): array
@@ -222,76 +239,15 @@ class EmailAccountController extends Controller
 
     private function ensureSchemaReady(): void
     {
-        if (! Schema::hasTable('email_accounts')) {
-            $this->createEmailAccountsTable();
-        }
-
-        $requiredColumns = [
-            'id',
-            'user_id',
-            'name',
-            'email_address',
-            'provider',
-            'status',
-            'smtp_host',
-            'smtp_port',
-            'smtp_username',
-            'smtp_password',
-            'imap_host',
-            'imap_port',
-            'imap_username',
-            'imap_password',
-            'warmup_enabled',
-            'daily_limit',
-            'hourly_limit',
-            'health_score',
-            'metadata',
-            'created_at',
-            'updated_at',
-        ];
-
-        if (! Schema::hasColumns('email_accounts', $requiredColumns)) {
-            throw new HttpResponseException(response()->json([
-                'message' => 'The mailbox schema is incomplete on this server. Run `php artisan migrate --force` to repair it.',
-            ], 503));
-        }
+        $this->schemaManager->ensureReady();
     }
 
-    private function createEmailAccountsTable(): void
+    private function resolveOwnedAccount(Request $request, int $emailAccount): EmailAccount
     {
-        Schema::create('email_accounts', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->string('name');
-            $table->string('from_name')->nullable();
-            $table->string('email_address');
-            $table->string('reply_to_address')->nullable();
-            $table->string('provider')->default('custom');
-            $table->string('status')->default('active')->index();
-            $table->string('smtp_host')->nullable();
-            $table->unsignedSmallInteger('smtp_port')->nullable();
-            $table->string('smtp_encryption')->nullable();
-            $table->string('smtp_username')->nullable();
-            $table->text('smtp_password')->nullable();
-            $table->string('imap_host')->nullable();
-            $table->unsignedSmallInteger('imap_port')->nullable();
-            $table->string('imap_encryption')->nullable();
-            $table->string('imap_username')->nullable();
-            $table->text('imap_password')->nullable();
-            $table->string('oauth_provider')->nullable();
-            $table->text('oauth_access_token')->nullable();
-            $table->text('oauth_refresh_token')->nullable();
-            $table->timestamp('oauth_expires_at')->nullable();
-            $table->boolean('warmup_enabled')->default(false);
-            $table->string('warmup_target_email')->nullable();
-            $table->unsignedSmallInteger('daily_limit')->default(150);
-            $table->unsignedSmallInteger('hourly_limit')->default(25);
-            $table->unsignedTinyInteger('health_score')->default(100);
-            $table->timestamp('last_synced_at')->nullable();
-            $table->json('metadata')->nullable();
-            $table->timestamps();
-
-            $table->unique(['user_id', 'email_address']);
-        });
+        try {
+            return $request->user()->emailAccounts()->findOrFail($emailAccount);
+        } catch (ModelNotFoundException) {
+            abort(404, 'Mailbox account not found.');
+        }
     }
 }

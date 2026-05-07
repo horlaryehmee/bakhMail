@@ -68,10 +68,10 @@ export function EmailAccountsPage() {
 
     try {
       if (editingId) {
-        await api.put(`/api/email-accounts/${editingId}`, form);
+        await api.post(`/api/email-accounts/${editingId}/save`, form);
         toast.success('Mailbox updated');
       } else {
-        await api.post('/api/email-accounts', form);
+        await api.post('/api/email-accounts/connect', form);
         toast.success('Mailbox connected');
       }
 
@@ -92,7 +92,7 @@ export function EmailAccountsPage() {
 
   async function sendTest(accountId) {
     try {
-      await api.post(`/api/email-accounts/${accountId}/test`, {});
+      await api.post(`/api/email-accounts/${accountId}/test-connection`, {});
       toast.success('Test email sent');
     } catch (error) {
       toast.error(error.payload?.message || error.message || 'SMTP test failed');
@@ -101,7 +101,7 @@ export function EmailAccountsPage() {
 
   async function removeAccount(accountId) {
     try {
-      await api.delete(`/api/email-accounts/${accountId}`);
+      await api.post(`/api/email-accounts/${accountId}/remove`, {});
       toast.success('Mailbox removed');
       load();
     } catch (error) {
