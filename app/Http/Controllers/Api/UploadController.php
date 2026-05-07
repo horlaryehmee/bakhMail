@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -12,6 +13,25 @@ use Illuminate\Support\Facades\Validator;
 
 class UploadController extends Controller
 {
+    private const BLOCKED_EXTENSIONS = [
+        'php', 'php3', 'php4', 'php5', 'phtml', 'phar', 'cgi', 'pl', 'py', 'rb', 'sh', 'bash',
+        'bat', 'cmd', 'com', 'exe', 'dll', 'msi', 'htaccess', 'js', 'mjs', 'html', 'htm',
+    ];
+
+    private const ALLOWED_MIME_PREFIXES = ['image/', 'audio/', 'video/', 'text/'];
+
+    private const ALLOWED_MIME_TYPES = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.ms-excel',
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'application/zip',
+        'application/x-zip-compressed',
+    ];
+
     public function store(Request $request): JsonResponse
     {
         $files = $request->file('files', []);
@@ -24,7 +44,23 @@ class UploadController extends Controller
             'files' => $files,
         ], [
             'files' => ['required', 'array', 'max:10'],
-            'files.*' => ['file', 'max:15360'],
+            'files.*' => ['file', 'max:15360', function (string $attribute, UploadedFile $file, Closure $fail): void {
+                $extension = strtolower($file->getClientOriginalExtension());
+                $mimeType = strtolower((string) $file->getMimeType());
+
+                if (in_array($extension, self::BLOCKED_EXTENSIONS, true)) {
+                    $fail('This file type is not allowed.');
+                    return;
+                }
+
+                $hasAllowedPrefix = collect(self::ALLOWED_MIME_PREFIXES)->contains(
+                    fn (string $prefix): bool => str_starts_with($mimeType, $prefix)
+                );
+
+                if (! $hasAllowedPrefix && ! in_array($mimeType, self::ALLOWED_MIME_TYPES, true)) {
+                    $fail('This MIME type is not allowed.');
+                }
+            }],
         ])->validate();
 
         $directory = public_path('uploads');
