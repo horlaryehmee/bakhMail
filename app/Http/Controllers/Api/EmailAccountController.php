@@ -10,8 +10,8 @@ use App\Services\DynamicSmtpMailer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class EmailAccountController extends Controller
 {
@@ -45,19 +45,21 @@ class EmailAccountController extends Controller
         return response()->json(['data' => $this->serializeAccount($account)], 201);
     }
 
-    public function show(Request $request, EmailAccount $emailAccount): JsonResponse
+    public function show(Request $request, int $emailAccount): JsonResponse
     {
         $this->ensureSchemaReady();
 
+        $emailAccount = EmailAccount::query()->findOrFail($emailAccount);
         abort_unless($emailAccount->user_id === $request->user()->id, 404);
 
         return response()->json(['data' => $this->serializeAccount($emailAccount->loadCount(['emailLogs as sent_count' => fn ($query) => $query->where('event_type', 'sent')]))]);
     }
 
-    public function update(Request $request, EmailAccount $emailAccount): JsonResponse
+    public function update(Request $request, int $emailAccount): JsonResponse
     {
         $this->ensureSchemaReady();
 
+        $emailAccount = EmailAccount::query()->findOrFail($emailAccount);
         abort_unless($emailAccount->user_id === $request->user()->id, 404);
         $validated = $this->validatePayload($request, $emailAccount->id);
 
@@ -74,10 +76,11 @@ class EmailAccountController extends Controller
         return response()->json(['data' => $this->serializeAccount($emailAccount)]);
     }
 
-    public function destroy(Request $request, EmailAccount $emailAccount): JsonResponse
+    public function destroy(Request $request, int $emailAccount): JsonResponse
     {
         $this->ensureSchemaReady();
 
+        $emailAccount = EmailAccount::query()->findOrFail($emailAccount);
         abort_unless($emailAccount->user_id === $request->user()->id, 404);
         $address = $emailAccount->email_address;
         $emailAccount->delete();
@@ -100,10 +103,11 @@ class EmailAccountController extends Controller
         ]);
     }
 
-    public function test(Request $request, EmailAccount $emailAccount): JsonResponse
+    public function test(Request $request, int $emailAccount): JsonResponse
     {
         $this->ensureSchemaReady();
 
+        $emailAccount = EmailAccount::query()->findOrFail($emailAccount);
         abort_unless($emailAccount->user_id === $request->user()->id, 404);
 
         $validated = $request->validate([
@@ -197,10 +201,9 @@ class EmailAccountController extends Controller
     private function ensureSchemaReady(): void
     {
         if (! Schema::hasTable('email_accounts')) {
-            throw new HttpException(
-                503,
-                'The email account tables are not installed yet. Run `php artisan migrate --force` or `php artisan bakhmail:setup --force` on the server.'
-            );
+            throw new HttpResponseException(response()->json([
+                'message' => 'The email account tables are not installed yet. Run `php artisan migrate --force` or `php artisan bakhmail:setup --force` on the server.',
+            ], 503));
         }
     }
 }
