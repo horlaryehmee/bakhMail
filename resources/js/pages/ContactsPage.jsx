@@ -132,11 +132,17 @@ export function ContactsPage() {
         ]}
         actions={
           <>
-            <label className="ghost-button cursor-pointer">
-              <Upload size={16} />
-              <span>Import CSV</span>
-              <input hidden type="file" accept=".csv,text/csv" onChange={handleImport} />
-            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="ghost-button cursor-pointer">
+                <Upload size={16} />
+                <span>Import CSV</span>
+                <input hidden type="file" accept=".csv,text/csv" onChange={handleImport} />
+              </label>
+              <a className="ghost-button" href="/api/contacts/import-template">
+                <Download size={16} />
+                <span>Sample CSV</span>
+              </a>
+            </div>
             <a className="ghost-button" href="/api/contacts/export">
               <Download size={16} />
               <span>Export CSV</span>
@@ -195,6 +201,10 @@ export function ContactsPage() {
             Search
           </button>
         </div>
+
+        <p className="mt-4 text-sm text-slate-500">
+          Need the import format? Download the sample CSV to see the expected columns and example values.
+        </p>
       </section>
 
       <section className="surface-card table-shell">

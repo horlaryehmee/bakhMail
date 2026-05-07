@@ -139,6 +139,17 @@ class ContactController extends Controller
         }, 'contacts.csv', ['Content-Type' => 'text/csv']);
     }
 
+    public function importTemplate(): StreamedResponse
+    {
+        return response()->streamDownload(function (): void {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['first_name', 'last_name', 'email', 'company', 'job_title', 'phone', 'website', 'location', 'notes', 'status', 'tags', 'groups']);
+            fputcsv($handle, ['Ada', 'Okafor', 'ada@example.com', 'Acme Labs', 'Growth Lead', '+2348000000000', 'https://acme.example', 'Lagos', 'Met at SaaS meetup', 'active', 'ICP A|warm', 'Q2 prospects|Nigeria']);
+            fputcsv($handle, ['Musa', 'Bello', 'musa@example.com', 'Northwind', 'Founder', '', 'https://northwind.example', 'Abuja', '', 'inactive', 'founder', 'Trial list']);
+            fclose($handle);
+        }, 'contacts-import-sample.csv', ['Content-Type' => 'text/csv']);
+    }
+
     private function validatePayload(Request $request, ?int $ignoreId = null): array
     {
         return $request->validate([

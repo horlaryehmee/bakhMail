@@ -42,6 +42,7 @@ Route::prefix('api')->group(function (): void {
         Route::put('/profile', [SettingsController::class, 'profile'])->name('api.profile.update');
 
         Route::get('/contacts/export', [ContactController::class, 'export'])->name('api.contacts.export');
+        Route::get('/contacts/import-template', [ContactController::class, 'importTemplate'])->name('api.contacts.import-template');
         Route::post('/contacts/import', [ContactController::class, 'import'])->name('api.contacts.import');
         Route::apiResource('contacts', ContactController::class);
 

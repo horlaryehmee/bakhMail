@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\ContactGroup;
 use App\Models\Contact;
+use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use SplFileObject;
@@ -49,19 +51,53 @@ class ContactImportService
                 'website' => $payload['website'] ?? null,
                 'location' => $payload['location'] ?? null,
                 'notes' => $payload['notes'] ?? null,
+                'status' => $payload['status'] ?? 'active',
                 'custom_fields' => collect($payload)
-                    ->except(['first_name', 'last_name', 'email', 'company', 'job_title', 'title', 'phone', 'website', 'location', 'notes'])
+                    ->except(['first_name', 'last_name', 'email', 'company', 'job_title', 'title', 'phone', 'website', 'location', 'notes', 'status', 'tags', 'groups'])
                     ->filter(fn ($value) => filled($value))
                     ->all(),
             ]);
 
             $contact->exists ? $updated++ : $created++;
             $contact->save();
+            $this->syncTaxonomy($user, $contact, $payload);
         }
 
         return [
             'created' => $created,
             'updated' => $updated,
         ];
+    }
+
+    private function syncTaxonomy(User $user, Contact $contact, array $payload): void
+    {
+        $tagIds = $this->resolveNames((string) ($payload['tags'] ?? ''))
+            ->map(fn (string $name) => Tag::firstOrCreate(
+                ['user_id' => $user->id, 'name' => $name],
+                ['color' => '#14b8a6'],
+            )->id)
+            ->all();
+
+        $groupIds = $this->resolveNames((string) ($payload['groups'] ?? ''))
+            ->map(fn (string $name) => ContactGroup::firstOrCreate(
+                ['user_id' => $user->id, 'name' => $name],
+                ['color' => '#60a5fa'],
+            )->id)
+            ->all();
+
+        if ($tagIds !== []) {
+            $contact->tags()->sync($tagIds);
+        }
+
+        if ($groupIds !== []) {
+            $contact->groups()->sync($groupIds);
+        }
+    }
+
+    private function resolveNames(string $value)
+    {
+        return collect(preg_split('/[|,]/', $value) ?: [])
+            ->map(fn ($item) => trim((string) $item))
+            ->filter();
     }
 }

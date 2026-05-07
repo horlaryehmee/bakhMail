@@ -3,12 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { ArrowRight, KeyRound, ShieldCheck } from 'lucide-react';
+import { AppLogo } from '../components/AppLogo';
 import { api } from '../lib/api';
 import { useAppStore } from '../store/useAppStore';
 import { ThemeToggle } from '../components/ThemeToggle';
 
 export function TwoFactorPage() {
-  const appName = useAppStore((state) => state.appName);
   const navigate = useNavigate();
   const setUser = useAppStore((state) => state.setUser);
   const [form, setForm] = useState({ code: '', recovery_code: '' });
@@ -44,11 +44,7 @@ export function TwoFactorPage() {
       >
         <div className="signin-simple-topbar">
           <Link to="/login" className="signin-simple-brand">
-            <span className="app-brand-mark">B</span>
-            <span>
-              <span className="signin-simple-label">Platform</span>
-              <span className="signin-simple-name">{appName}</span>
-            </span>
+            <AppLogo />
           </Link>
           <ThemeToggle compact />
         </div>

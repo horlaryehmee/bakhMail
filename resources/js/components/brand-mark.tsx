@@ -20,7 +20,7 @@ export function BrandMark({
   compact?: boolean;
   className?: string;
 }) {
-  const resolvedLogoUrl = assetUrl(branding.logoUrl, branding.logoVersion);
+  const resolvedLogoUrl = assetUrl(branding.logoUrl, branding.logoVersion) || "/bakhmail-logo.png";
   const resolvedTitle = title ?? branding.brandName ?? "Bakhtech Solutions";
   const logoScale = Math.min(Math.max(branding.logoSize ?? 1, 0.8), 1.8);
   const frameSize = compact ? 44 : 56;

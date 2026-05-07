@@ -942,59 +942,48 @@ export function CampaignsPage() {
           ) : null}
 
           {wizardStep === 1 ? (
-            <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-              <div className="space-y-4">
+            <section className="campaign-details-shell">
+              <div className="campaign-details-main">
                 <div className="surface-card-muted p-5">
-                  <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Step 2</p>
-                  <h3 className="mt-2 text-2xl font-semibold text-slate-950">Finalize campaign details</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-500">
-                    With the core email built, set the campaign identity, sharpen the inbox-facing copy, choose recipients, and decide how delivery should happen.
-                  </p>
-                </div>
-
-                <div className="surface-card-muted p-5">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="campaign-details-header">
                     <div>
-                      <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">AI detail assist</p>
-                      <h4 className="mt-2 text-xl font-semibold text-slate-950">Polish the settings with AI</h4>
-                      <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                        Use the current email draft plus your brief to refine the campaign name, improve the subject line, tighten the preview text, and get audience and timing guidance.
-                      </p>
+                      <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Step 2</p>
+                      <h3 className="mt-2 text-2xl font-semibold text-slate-950">Campaign details</h3>
+                      <p className="mt-2 text-sm leading-6 text-slate-500">Set the campaign name, email copy, recipients, and delivery timing.</p>
                     </div>
                     <button className="primary-button" type="button" onClick={assistCampaignDetailsWithAi} disabled={detailsAiBusy}>
                       <Sparkles size={16} />
                       {detailsAiBusy ? 'Refining...' : 'Refine with AI'}
                     </button>
                   </div>
-                  {detailsInsights ? (
-                    <div className="mt-4 grid gap-3 md:grid-cols-3">
-                      <div className="campaign-summary-tile !items-start !flex-col">
-                        <span>Audience strategy</span>
-                        <strong className="!normal-case">{detailsInsights.audience_strategy || 'No suggestion yet'}</strong>
-                      </div>
-                      <div className="campaign-summary-tile !items-start !flex-col">
-                        <span>Send strategy</span>
-                        <strong className="!normal-case">{detailsInsights.send_strategy || 'No suggestion yet'}</strong>
-                      </div>
-                      <div className="campaign-summary-tile !items-start !flex-col">
-                        <span>Quality note</span>
-                        <strong className="!normal-case">{detailsInsights.quality_note || 'No suggestion yet'}</strong>
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
 
                 <div className="surface-card-muted p-5">
-                  <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Campaign identity</p>
-                  <div className="mt-4 grid gap-4 md:grid-cols-2">
-                    <label className="field-shell md:col-span-2">
+                  <div className="campaign-details-grid">
+                    <label className="field-shell campaign-details-grid__wide">
                       <span className="field-label">Campaign name</span>
                       <input className="field-input" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
                     </label>
                     <label className="field-shell">
+                      <span className="field-label">Subject line</span>
+                      <input className="field-input" value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })} />
+                      <span className="text-xs text-slate-400">{form.subject.length}/255</span>
+                    </label>
+                    <label className="field-shell">
+                      <span className="field-label">Preview text</span>
+                      <textarea className="field-input min-h-24" value={form.preview_text} onChange={(event) => setForm({ ...form, preview_text: event.target.value })} />
+                      <span className="text-xs text-slate-400">{form.preview_text.length}/255</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="campaign-details-grid">
+                  <div className="surface-card-muted p-5">
+                    <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Senders</p>
+                    <label className="field-shell mt-4">
                       <span className="field-label">Sender mailbox pool</span>
                       <select
-                        className="field-input min-h-40"
+                        className="field-input campaign-multi-select"
                         multiple
                         value={form.selected_email_account_ids}
                         onChange={(event) =>
@@ -1011,94 +1000,63 @@ export function CampaignsPage() {
                         ))}
                       </select>
                     </label>
-                    <div className="campaign-summary-panel">
-                      <div className="campaign-summary-tile">
-                        <span>Selected senders</span>
-                        <strong>{form.selected_email_account_ids.length}</strong>
-                      </div>
-                      <div className="campaign-summary-tile">
-                        <span>Primary route</span>
-                        <strong>{accounts.find((account) => account.id === form.selected_email_account_ids[0])?.email_address || 'Not selected'}</strong>
-                      </div>
+                  </div>
+
+                  <div className="surface-card-muted p-5">
+                    <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Recipients</p>
+                    <div className="mt-4 grid gap-4">
+                      <label className="field-shell">
+                        <span className="field-label">Tag segments</span>
+                        <select
+                          className="field-input campaign-multi-select"
+                          multiple
+                          value={form.audience_filters.tag_ids}
+                          onChange={(event) =>
+                            setForm({
+                              ...form,
+                              audience_filters: {
+                                ...form.audience_filters,
+                                tag_ids: Array.from(event.target.selectedOptions).map((option) => Number(option.value)),
+                              },
+                            })
+                          }
+                        >
+                          {filters.tags.map((tag) => (
+                            <option key={tag.id} value={tag.id}>
+                              {tag.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="field-shell">
+                        <span className="field-label">Group segments</span>
+                        <select
+                          className="field-input campaign-multi-select"
+                          multiple
+                          value={form.audience_filters.group_ids}
+                          onChange={(event) =>
+                            setForm({
+                              ...form,
+                              audience_filters: {
+                                ...form.audience_filters,
+                                group_ids: Array.from(event.target.selectedOptions).map((option) => Number(option.value)),
+                              },
+                            })
+                          }
+                        >
+                          {filters.groups.map((group) => (
+                            <option key={group.id} value={group.id}>
+                              {group.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                     </div>
                   </div>
                 </div>
 
                 <div className="surface-card-muted p-5">
-                  <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Email content settings</p>
-                  <div className="mt-4 grid gap-4">
-                    <label className="field-shell">
-                      <span className="field-label">Subject line</span>
-                      <input className="field-input" value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })} />
-                      <span className="text-xs text-slate-400">{form.subject.length}/255 characters</span>
-                    </label>
-                    <label className="field-shell">
-                      <span className="field-label">Preview text</span>
-                      <textarea className="field-input min-h-24" value={form.preview_text} onChange={(event) => setForm({ ...form, preview_text: event.target.value })} />
-                      <span className="text-xs text-slate-400">{form.preview_text.length}/255 characters</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="surface-card-muted p-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Recipient lists</p>
-                      <p className="mt-2 text-sm leading-6 text-slate-500">Choose the segments that should receive this campaign.</p>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid gap-4 md:grid-cols-2">
-                    <label className="field-shell">
-                      <span className="field-label">Tag segments</span>
-                      <select
-                        className="field-input min-h-32"
-                        multiple
-                        value={form.audience_filters.tag_ids}
-                        onChange={(event) =>
-                          setForm({
-                            ...form,
-                            audience_filters: {
-                              ...form.audience_filters,
-                              tag_ids: Array.from(event.target.selectedOptions).map((option) => Number(option.value)),
-                            },
-                          })
-                        }
-                      >
-                        {filters.tags.map((tag) => (
-                          <option key={tag.id} value={tag.id}>
-                            {tag.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="field-shell">
-                      <span className="field-label">Group segments</span>
-                      <select
-                        className="field-input min-h-32"
-                        multiple
-                        value={form.audience_filters.group_ids}
-                        onChange={(event) =>
-                          setForm({
-                            ...form,
-                            audience_filters: {
-                              ...form.audience_filters,
-                              group_ids: Array.from(event.target.selectedOptions).map((option) => Number(option.value)),
-                            },
-                          })
-                        }
-                      >
-                        {filters.groups.map((group) => (
-                          <option key={group.id} value={group.id}>
-                            {group.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="surface-card-muted p-5">
-                  <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Scheduling</p>
+                  <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Delivery</p>
                   <div className="mt-4 grid gap-4 md:grid-cols-2">
                     <button
                       type="button"
@@ -1106,15 +1064,15 @@ export function CampaignsPage() {
                       onClick={() => setForm({ ...form, scheduled_at: '' })}
                     >
                       <strong>Send now</strong>
-                      <span>Queue the campaign for delivery as soon as it is launched.</span>
+                      <span>Launch immediately.</span>
                     </button>
                     <button
                       type="button"
                       className={`campaign-choice-card ${scheduleMode === 'later' ? 'campaign-choice-card--active' : ''}`}
                       onClick={() => !form.scheduled_at && setForm({ ...form, scheduled_at: new Date().toISOString().slice(0, 16) })}
                     >
-                      <strong>Schedule for later</strong>
-                      <span>Choose a date and time for automated delivery.</span>
+                      <strong>Schedule</strong>
+                      <span>Choose a future time.</span>
                     </button>
                   </div>
                   {scheduleMode === 'later' ? (
@@ -1126,42 +1084,37 @@ export function CampaignsPage() {
                 </div>
               </div>
 
-              <div className="space-y-4">
+              <aside className="campaign-details-side">
                 <div className="surface-card-muted p-5">
-                  <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Summary</p>
-                  <h3 className="mt-2 text-2xl font-semibold text-slate-950">Campaign snapshot</h3>
+                  <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Snapshot</p>
                   <div className="mt-4 space-y-3">
                     <div className="campaign-summary-tile"><span>Name</span><strong>{form.name || 'Untitled campaign'}</strong></div>
                     <div className="campaign-summary-tile"><span>Subject</span><strong>{form.subject || 'No subject yet'}</strong></div>
                     <div className="campaign-summary-tile"><span>Mailboxes</span><strong>{form.selected_email_account_ids.length}</strong></div>
-                    <div className="campaign-summary-tile"><span>Builder blocks</span><strong>{builderBlocks.length}</strong></div>
-                    <div className="campaign-summary-tile"><span>Recipients filters</span><strong>{form.audience_filters.tag_ids.length + form.audience_filters.group_ids.length}</strong></div>
-                    <div className="campaign-summary-tile"><span>Delivery</span><strong>{scheduleMode === 'later' ? form.scheduled_at : 'Send immediately after launch'}</strong></div>
+                    <div className="campaign-summary-tile"><span>Recipients</span><strong>{form.audience_filters.tag_ids.length + form.audience_filters.group_ids.length}</strong></div>
+                    <div className="campaign-summary-tile"><span>Delivery</span><strong>{scheduleMode === 'later' ? form.scheduled_at : 'Send immediately'}</strong></div>
                   </div>
                 </div>
 
                 <div className="surface-card-muted p-5">
-                  <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Email content</p>
-                  <h3 className="mt-2 text-2xl font-semibold text-slate-950">Opening email structure</h3>
-                  <div className="mt-4 campaign-builder-outline">
-                    {builderBlocks.map((block, index) => (
-                      <div key={block.id} className="campaign-builder-outline__item">
-                        <span>{index + 1}</span>
-                        <strong>{block.type}</strong>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="surface-card-muted p-5">
-                  <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Readability checks</p>
+                  <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Checks</p>
                   <div className="mt-4 space-y-3">
-                    <div className="campaign-summary-tile"><span>Subject quality</span><strong>{form.subject.length > 0 && form.subject.length <= 60 ? 'Healthy' : 'Needs tightening'}</strong></div>
-                    <div className="campaign-summary-tile"><span>Preview length</span><strong>{form.preview_text.length > 0 && form.preview_text.length <= 120 ? 'Healthy' : 'Needs tightening'}</strong></div>
-                    <div className="campaign-summary-tile"><span>AI recommendation</span><strong>{detailsInsights?.quality_note || 'Run AI detail assist for guidance'}</strong></div>
+                    <div className="campaign-summary-tile"><span>Subject</span><strong>{form.subject.length > 0 && form.subject.length <= 60 ? 'Healthy' : 'Needs work'}</strong></div>
+                    <div className="campaign-summary-tile"><span>Preview</span><strong>{form.preview_text.length > 0 && form.preview_text.length <= 120 ? 'Healthy' : 'Needs work'}</strong></div>
+                    <div className="campaign-summary-tile"><span>AI note</span><strong>{detailsInsights?.quality_note || 'No note yet'}</strong></div>
                   </div>
                 </div>
-              </div>
+
+                {detailsInsights ? (
+                  <div className="surface-card-muted p-5">
+                    <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">AI suggestions</p>
+                    <div className="mt-4 space-y-3">
+                      <div className="campaign-summary-tile"><span>Audience</span><strong>{detailsInsights.audience_strategy || 'No suggestion yet'}</strong></div>
+                      <div className="campaign-summary-tile"><span>Send plan</span><strong>{detailsInsights.send_strategy || 'No suggestion yet'}</strong></div>
+                    </div>
+                  </div>
+                ) : null}
+              </aside>
             </section>
           ) : null}
 

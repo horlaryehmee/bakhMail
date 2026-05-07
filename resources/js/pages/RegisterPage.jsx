@@ -3,12 +3,12 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { ArrowRight, Mail, UserRound } from 'lucide-react';
+import { AppLogo } from '../components/AppLogo';
 import { api } from '../lib/api';
 import { useAppStore } from '../store/useAppStore';
 import { ThemeToggle } from '../components/ThemeToggle';
 
 export function RegisterPage() {
-  const appName = useAppStore((state) => state.appName);
   const user = useAppStore((state) => state.user);
   const setUser = useAppStore((state) => state.setUser);
   const navigate = useNavigate();
@@ -48,11 +48,7 @@ export function RegisterPage() {
       >
         <div className="signin-simple-topbar">
           <Link to="/login" className="signin-simple-brand">
-            <span className="app-brand-mark">B</span>
-            <span>
-              <span className="signin-simple-label">Platform</span>
-              <span className="signin-simple-name">{appName}</span>
-            </span>
+            <AppLogo />
           </Link>
           <ThemeToggle compact />
         </div>

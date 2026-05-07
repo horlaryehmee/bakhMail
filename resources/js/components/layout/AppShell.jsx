@@ -19,6 +19,7 @@ import {
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { ThemeToggle } from '../ThemeToggle';
+import { AppLogo } from '../AppLogo';
 import { useAppStore } from '../../store/useAppStore';
 
 const baseLinks = [
@@ -38,11 +39,7 @@ function DesktopSidebar({ appName, user, notifications, today, links, onClose, o
     <div className="surface-card app-shell__sidebar flex h-full w-full flex-col overflow-hidden p-4">
       <div className="mb-5 flex items-center justify-between gap-3">
         <Link to="/dashboard" className="flex items-center gap-3">
-          <div className="app-brand-mark">B</div>
-          <div>
-            <p className="eyebrow !text-[0.58rem] !tracking-[0.22em]">Outbound desk</p>
-            <h1 className="text-lg font-semibold text-slate-950">{appName}</h1>
-          </div>
+          <AppLogo />
         </Link>
         {onClose ? (
           <button className="ghost-button xl:hidden" type="button" onClick={onClose}>
@@ -255,7 +252,7 @@ export function AppShell({ children }) {
                   </button>
                 </div>
                 <Link to="/dashboard" className="lg:hidden">
-                  <div className="app-brand-mark">B</div>
+                  <AppLogo className="app-logo--compact" />
                 </Link>
                 <div className="hidden min-w-0 lg:block">
                   <p className="eyebrow !text-[0.58rem] !tracking-[0.22em]">Operations workspace</p>
