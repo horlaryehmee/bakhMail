@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Plus, Radar, Send, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Modal } from '../components/Modal';
-import { MetricCard } from '../components/MetricCard';
-import { PageHeader } from '../components/PageHeader';
 import { StatusBadge } from '../components/StatusBadge';
 import { api } from '../lib/api';
 
@@ -113,33 +111,44 @@ export function EmailAccountsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Email infrastructure"
-        title="Manage sender accounts, monitor domain health, and keep reply sync stable."
-        description="Each mailbox can be configured for SMTP sending, IMAP reply sync, warm-up behavior, and send limits from a single screen."
-        stats={[
-          { label: 'Accounts', value: accounts.length },
-          { label: 'Warm-up on', value: warmupEnabled },
-          { label: 'Avg health', value: `${averageHealth}/100` },
-        ]}
-        actions={
-          <button className="primary-button" type="button" onClick={openNewModal}>
-            <Plus size={16} />
-            <span>Connect account</span>
-          </button>
-        }
-      />
+      <section className="surface-card email-accounts-hero">
+        <div className="email-accounts-hero__body">
+          <div className="space-y-2">
+            <p className="eyebrow !mb-0">Email infrastructure</p>
+            <h1 className="email-accounts-hero__title">Sender accounts</h1>
+            <p className="email-accounts-hero__copy">
+              Connect SMTP and IMAP mailboxes, run health checks, and manage warm-up from one screen.
+            </p>
+          </div>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <MetricCard label="Connected accounts" value={accounts.length} hint="Active lanes" tone="blue" />
-        <MetricCard label="Warm-up enabled" value={warmupEnabled} hint="Protected ramp-up" tone="emerald" />
-        <MetricCard label="Average health" value={`${averageHealth}/100`} hint="Mailbox quality" tone="amber" />
+          <div className="email-accounts-hero__actions">
+            <button className="primary-button" type="button" onClick={openNewModal}>
+              <Plus size={16} />
+              <span>Connect account</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="email-accounts-hero__stats">
+          <div className="email-accounts-hero__stat">
+            <span className="email-accounts-hero__stat-label">Accounts</span>
+            <strong className="email-accounts-hero__stat-value">{accounts.length}</strong>
+          </div>
+          <div className="email-accounts-hero__stat">
+            <span className="email-accounts-hero__stat-label">Warm-up on</span>
+            <strong className="email-accounts-hero__stat-value">{warmupEnabled}</strong>
+          </div>
+          <div className="email-accounts-hero__stat">
+            <span className="email-accounts-hero__stat-label">Avg health</span>
+            <strong className="email-accounts-hero__stat-value">{averageHealth}/100</strong>
+          </div>
+        </div>
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <section className="surface-card table-shell">
           <div className="overflow-x-auto">
-            <table className="data-table min-w-[980px] text-left">
+            <table className="data-table min-w-[760px] text-left">
               <thead>
                 <tr>
                   <th>Mailbox</th>
@@ -204,7 +213,7 @@ export function EmailAccountsPage() {
             </div>
             <div>
               <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Deliverability</p>
-              <h3 className="text-2xl font-semibold text-slate-950">SPF, DKIM, and DMARC guidance</h3>
+              <h3 className="text-xl font-semibold text-slate-950">SPF, DKIM, and DMARC</h3>
             </div>
           </div>
 
