@@ -73,7 +73,8 @@ export function ContactsPage() {
       setEditingId(null);
       loadContacts(search);
     } catch (error) {
-      toast.error(error.payload?.message || 'Could not save contact');
+      const firstError = Object.values(error.payload?.errors || {})?.[0]?.[0];
+      toast.error(firstError || error.payload?.message || error.message || 'Could not save contact');
     }
   }
 

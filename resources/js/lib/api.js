@@ -47,7 +47,18 @@ async function request(url, options = {}) {
   }
 
   if (!response.ok) {
-    const error = new Error(payload?.message || response.statusText || 'Request failed');
+    const fallbackMessage = response.status === 419
+      ? 'Your session expired. Refresh the page and sign in again.'
+      : response.status === 403
+        ? 'You do not have permission to perform this action.'
+        : response.status === 404
+          ? 'The requested resource was not found.'
+          : response.status === 422
+            ? 'Please review the form and correct any invalid fields.'
+            : response.status
+              ? `Request failed (${response.status})`
+              : 'Request failed';
+    const error = new Error(payload?.message || response.statusText || fallbackMessage);
     error.payload = payload;
     error.status = response.status;
     throw error;
