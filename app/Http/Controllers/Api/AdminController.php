@@ -8,11 +8,13 @@ use App\Models\Campaign;
 use App\Models\Contact;
 use App\Models\EmailLog;
 use App\Models\User;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class AdminController extends Controller
 {
@@ -129,5 +131,21 @@ class AdminController extends Controller
         }
 
         return response()->json(['status' => 'saved']);
+    }
+
+    public function migrateDatabase(): JsonResponse
+    {
+        try {
+            Artisan::call('migrate', ['--force' => true]);
+
+            return response()->json([
+                'status' => 'ok',
+                'output' => trim(Artisan::output()),
+            ]);
+        } catch (Throwable $exception) {
+            return response()->json([
+                'message' => $exception->getMessage() ?: 'Database update failed.',
+            ], 500);
+        }
     }
 }

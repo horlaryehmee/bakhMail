@@ -21,6 +21,8 @@ export function AdminPage() {
   const [responsePrompt, setResponsePrompt] = useState('Tell me a three sentence bedtime story about a unicorn.');
   const [groqResult, setGroqResult] = useState(null);
   const [groqBusy, setGroqBusy] = useState(false);
+  const [migrationBusy, setMigrationBusy] = useState(false);
+  const [migrationOutput, setMigrationOutput] = useState('');
 
   async function load() {
     const [summaryResponse, usersResponse, settingsResponse, groqStatusResponse] = await Promise.all([
@@ -115,6 +117,22 @@ export function AdminPage() {
     }
   }
 
+  async function runDatabaseUpdate() {
+    setMigrationBusy(true);
+
+    try {
+      const response = await api.post('/api/admin/database/migrate', {});
+      setMigrationOutput(response.output || 'Database is up to date.');
+      await load();
+      toast.success('Database update completed');
+    } catch (error) {
+      setMigrationOutput(error.payload?.message || error.message || 'Database update failed');
+      toast.error(error.payload?.message || error.message || 'Could not update database');
+    } finally {
+      setMigrationBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -199,6 +217,26 @@ export function AdminPage() {
         <button className="primary-button mt-5" type="button" onClick={saveSettings}>
           Save settings
         </button>
+      </section>
+
+      <section className="surface-card p-5 sm:p-6">
+        <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Database maintenance</p>
+        <h3 className="mt-2 text-2xl font-semibold text-slate-950">Update database tables</h3>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-500">
+          Run pending Laravel migrations from the admin panel. Use this when a live deployment is missing tables or columns after an update.
+        </p>
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <button className="primary-button" type="button" onClick={runDatabaseUpdate} disabled={migrationBusy}>
+            <Waypoints size={16} />
+            {migrationBusy ? 'Updating database...' : 'Update database'}
+          </button>
+          <span className="text-sm text-slate-500">This runs pending migrations with force enabled.</span>
+        </div>
+        {migrationOutput ? (
+          <pre className="mt-4 overflow-x-auto rounded-[20px] border border-slate-200 bg-slate-950 px-4 py-3 text-xs leading-6 text-slate-100 whitespace-pre-wrap">
+            {migrationOutput}
+          </pre>
+        ) : null}
       </section>
 
       <section className="surface-card p-5 sm:p-6">

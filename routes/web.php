@@ -83,6 +83,7 @@ Route::prefix('api')->group(function (): void {
             Route::put('/users/{user}', [AdminController::class, 'updateUser'])->name('api.admin.users.update');
             Route::get('/settings', [AdminController::class, 'settings'])->name('api.admin.settings');
             Route::put('/settings', [AdminController::class, 'updateSettings'])->name('api.admin.settings.update');
+            Route::post('/database/migrate', [AdminController::class, 'migrateDatabase'])->name('api.admin.database.migrate');
             Route::get('/groq/status', [GroqController::class, 'status'])->name('api.admin.groq.status');
             Route::get('/groq/models', [GroqController::class, 'models'])->name('api.admin.groq.models');
             Route::post('/groq/responses', [GroqController::class, 'responses'])->name('api.admin.groq.responses');
