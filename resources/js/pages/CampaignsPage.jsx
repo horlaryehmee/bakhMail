@@ -209,9 +209,10 @@ function sanitizeUrl(value) {
 function buildTemplateHtml(blocks, options = {}) {
   const normalizedBlocks = ensureBuilderStructure(blocks);
   const emailBackgroundColor = options.emailBackgroundColor || '#fffaf3';
+  const contentSidePadding = options.contentSidePadding ?? 24;
   const content = normalizedBlocks
     .map((block) => {
-      const commonPadding = `padding:${block.paddingTop ?? 0}px 0 ${block.paddingBottom ?? 0}px;`;
+      const commonPadding = `padding:${block.paddingTop ?? 0}px ${contentSidePadding}px ${block.paddingBottom ?? 0}px;`;
 
       if (block.type === 'text') {
         const html = sanitizeText(block.content).replace(/\n/g, '<br />');
@@ -244,7 +245,15 @@ function buildTemplateHtml(blocks, options = {}) {
     })
     .join('');
 
-  return `<div style="width:100%;margin:0;padding:0;background:${emailBackgroundColor};font-family:Manrope,Arial,sans-serif;color:#201a16;">${content}</div>`;
+  return `
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;margin:0;padding:0;border-collapse:collapse;background:${emailBackgroundColor};font-family:Manrope,Arial,sans-serif;color:#201a16;">
+      <tr>
+        <td style="margin:0;padding:0;background:${emailBackgroundColor};">
+          ${content}
+        </td>
+      </tr>
+    </table>
+  `.trim();
 }
 
 function buildTemplateText(blocks) {
