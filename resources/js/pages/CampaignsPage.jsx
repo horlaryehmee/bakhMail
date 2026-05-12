@@ -545,6 +545,9 @@ export function CampaignsPage() {
 
   function openNewModal() {
     const nextCampaign = applySavedTemplateToCampaign(createEmptyCampaign(), savedTemplate);
+    if (!nextCampaign.selected_email_account_ids?.length && accounts.length === 1) {
+      nextCampaign.selected_email_account_ids = [accounts[0].id];
+    }
     setEditingId(null);
     setForm(nextCampaign);
     setSelectedBlockId(nextCampaign.settings.builder_blocks[0]?.id ?? null);
@@ -904,7 +907,11 @@ export function CampaignsPage() {
   }
 
   async function sendTestEmail() {
-    if (!form.selected_email_account_ids?.length) {
+    const senderIds = form.selected_email_account_ids?.length
+      ? form.selected_email_account_ids
+      : (accounts.length === 1 ? [accounts[0].id] : []);
+
+    if (!senderIds.length) {
       toast.error('Choose a sending mailbox first');
       return;
     }
@@ -919,7 +926,7 @@ export function CampaignsPage() {
     try {
       await api.post('/api/campaigns/test-draft', {
         to_email: testEmail.trim() || undefined,
-        selected_email_account_ids: form.selected_email_account_ids,
+        selected_email_account_ids: senderIds,
         subject: form.subject || 'Test campaign email',
         template_html: buildTemplateHtml(builderBlocks),
         template_text: buildTemplateText(builderBlocks),
@@ -1633,7 +1640,25 @@ export function CampaignsPage() {
                 <div className="text-sm text-slate-500">
                   Step {wizardStep + 1} of {CAMPAIGN_WIZARD_STEPS.length}: {CAMPAIGN_WIZARD_STEPS[wizardStep].label}
                 </div>
-                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_13rem_11rem_auto]">
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_13rem_11rem_auto]">
+                  <label className="field-shell">
+                    <span className="field-label">Send from</span>
+                    <select
+                      className="field-input"
+                      value={form.selected_email_account_ids?.[0] ?? (accounts.length === 1 ? accounts[0].id : '')}
+                      onChange={(event) => setForm((current) => ({
+                        ...current,
+                        selected_email_account_ids: event.target.value ? [Number(event.target.value)] : [],
+                      }))}
+                    >
+                      <option value="">Choose mailbox</option>
+                      {accounts.map((account) => (
+                        <option key={account.id} value={account.id}>
+                          {account.email_address}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <label className="field-shell">
                     <span className="field-label">Send test to</span>
                     <input
@@ -1653,10 +1678,10 @@ export function CampaignsPage() {
                         </option>
                       ))}
                     </select>
-                  </label>
-                  <div className="text-xs leading-6 text-slate-500 lg:self-end">
-                    Sends using the first selected mailbox.
-                  </div>
+                    </label>
+                    <div className="text-xs leading-6 text-slate-500 lg:self-end">
+                      Pick a mailbox here, then send a live test from any setup step.
+                    </div>
                   <button className="ghost-button lg:self-end" type="button" onClick={sendTestEmail} disabled={testSending}>
                     {testSending ? 'Sending test...' : 'Send test email'}
                   </button>
