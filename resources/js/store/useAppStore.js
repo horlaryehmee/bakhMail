@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { api } from '../lib/api';
+import { api, setCsrfToken } from '../lib/api';
 
 const initialPayload = (() => {
   const node = document.getElementById('app');
@@ -24,6 +24,8 @@ function resolveInitialTheme() {
 function resolveInitialMobileRailCollapsed() {
   return window.localStorage.getItem('bakhmail-mobile-rail-collapsed') === 'true';
 }
+
+setCsrfToken(initialPayload.csrfToken ?? '');
 
 export const useAppStore = create((set) => ({
   appName: initialPayload.appName ?? 'BakhMail',
@@ -65,6 +67,9 @@ export const useAppStore = create((set) => ({
     }),
   fetchSession: async () => {
     const response = await api.get('/api/me');
+    if (response.csrf_token) {
+      setCsrfToken(response.csrf_token);
+    }
     set({ user: response.user });
     return response.user;
   },
@@ -74,7 +79,10 @@ export const useAppStore = create((set) => ({
     return response.data || [];
   },
   logout: async () => {
-    await api.post('/auth/logout', {});
+    const response = await api.post('/auth/logout', {});
+    if (response.csrf_token) {
+      setCsrfToken(response.csrf_token);
+    }
     set({ user: null, notifications: [] });
   },
 }));

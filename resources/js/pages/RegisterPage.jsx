@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { ArrowRight, Mail, UserRound } from 'lucide-react';
 import { AppLogo } from '../components/AppLogo';
-import { api } from '../lib/api';
+import { api, setCsrfToken } from '../lib/api';
 import { useAppStore } from '../store/useAppStore';
 import { ThemeToggle } from '../components/ThemeToggle';
 
@@ -25,6 +25,9 @@ export function RegisterPage() {
 
     try {
       const response = await api.post('/auth/register', form);
+      if (response.csrf_token) {
+        setCsrfToken(response.csrf_token);
+      }
       setUser(response.user);
       toast.success('Workspace created');
       navigate('/dashboard');

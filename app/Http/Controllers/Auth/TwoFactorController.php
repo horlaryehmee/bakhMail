@@ -126,6 +126,7 @@ class TwoFactorController extends Controller
                 'avatar_color' => $user->avatar_color,
                 'two_factor_enabled' => true,
             ],
+            'csrf_token' => csrf_token(),
         ]);
     }
 }

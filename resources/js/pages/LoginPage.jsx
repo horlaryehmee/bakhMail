@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRight, ChevronDown, Mail, Radar } from 'lucide-react';
 import { AppLogo } from '../components/AppLogo';
-import { api } from '../lib/api';
+import { api, setCsrfToken } from '../lib/api';
 import { useAppStore } from '../store/useAppStore';
 import { ThemeToggle } from '../components/ThemeToggle';
 
@@ -29,11 +29,17 @@ export function LoginPage() {
       const response = await api.post('/auth/login', payload);
 
       if (response.requires_two_factor) {
+        if (response.csrf_token) {
+          setCsrfToken(response.csrf_token);
+        }
         toast('Two-factor challenge required');
         navigate('/2fa');
         return;
       }
 
+      if (response.csrf_token) {
+        setCsrfToken(response.csrf_token);
+      }
       setUser(response.user);
       toast.success('Welcome back');
       navigate('/dashboard');

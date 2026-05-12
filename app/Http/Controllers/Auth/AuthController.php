@@ -43,6 +43,7 @@ class AuthController extends Controller
 
         return response()->json([
             'user' => $this->serializeUser($user),
+            'csrf_token' => csrf_token(),
         ], 201);
     }
 
@@ -66,6 +67,7 @@ class AuthController extends Controller
 
             return response()->json([
                 'requires_two_factor' => true,
+                'csrf_token' => csrf_token(),
             ]);
         }
 
@@ -77,6 +79,7 @@ class AuthController extends Controller
 
         return response()->json([
             'user' => $this->serializeUser($user),
+            'csrf_token' => csrf_token(),
         ]);
     }
 
@@ -90,7 +93,10 @@ class AuthController extends Controller
 
         $this->activityLogger->log($user, 'auth.logged_out', $user, $request, description: 'User signed out.');
 
-        return response()->json(['status' => 'ok']);
+        return response()->json([
+            'status' => 'ok',
+            'csrf_token' => csrf_token(),
+        ]);
     }
 
     public function forgotPassword(Request $request): JsonResponse
@@ -139,6 +145,7 @@ class AuthController extends Controller
     {
         return response()->json([
             'user' => $request->user() ? $this->serializeUser($request->user()) : null,
+            'csrf_token' => csrf_token(),
         ]);
     }
 

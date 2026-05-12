@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { ArrowRight, KeyRound, ShieldCheck } from 'lucide-react';
 import { AppLogo } from '../components/AppLogo';
-import { api } from '../lib/api';
+import { api, setCsrfToken } from '../lib/api';
 import { useAppStore } from '../store/useAppStore';
 import { ThemeToggle } from '../components/ThemeToggle';
 
@@ -21,6 +21,9 @@ export function TwoFactorPage() {
     try {
       const payload = form.code ? { code: form.code } : { recovery_code: form.recovery_code };
       const response = await api.post('/auth/2fa/challenge', payload);
+      if (response.csrf_token) {
+        setCsrfToken(response.csrf_token);
+      }
       setUser(response.user);
       toast.success('Two-factor challenge passed');
       navigate('/dashboard');

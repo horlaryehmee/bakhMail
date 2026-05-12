@@ -3,6 +3,13 @@ const defaultHeaders = {
   'X-Requested-With': 'XMLHttpRequest',
 };
 
+export function setCsrfToken(token) {
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  if (meta) {
+    meta.setAttribute('content', token || '');
+  }
+}
+
 function csrfToken() {
   return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 }
