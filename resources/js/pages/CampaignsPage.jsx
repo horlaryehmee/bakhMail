@@ -242,7 +242,7 @@ function buildTemplateHtml(blocks) {
     })
     .join('');
 
-  return `<div style="width:100%;margin:0;padding:16px;background:#f4efe6;font-family:Manrope,Arial,sans-serif;color:#201a16;"><div style="max-width:640px;margin:0 auto;padding:20px;background:#fffaf3;border-radius:28px;">${content}</div></div>`;
+  return `<div style="width:100%;margin:0;padding:0;background:#fffaf3;font-family:Manrope,Arial,sans-serif;color:#201a16;"><div style="max-width:640px;margin:0 auto;padding:16px 12px;background:#fffaf3;">${content}</div></div>`;
 }
 
 function buildTemplateText(blocks) {
