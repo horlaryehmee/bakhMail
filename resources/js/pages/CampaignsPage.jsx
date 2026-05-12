@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, PointerSensor, closestCenter, useDraggable, useDroppable, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
@@ -28,10 +28,11 @@ import { StatusBadge } from '../components/StatusBadge';
 import { api } from '../lib/api';
 
 const PLACEHOLDER_TOKENS = ['{{first_name}}', '{{company}}', '{{job_title}}', '{{location}}'];
+const MAX_AI_BRIEF_CHARS = 1600;
 const CAMPAIGN_WIZARD_STEPS = [
-  { id: 'builder', label: 'Build email', description: 'Design the opening email' },
-  { id: 'details', label: 'Campaign details', description: 'Audience, sender, and timing' },
-  { id: 'sequence', label: 'Follow-up flow', description: 'Steps and final review' },
+  { id: 'builder', label: 'Write email', description: 'Create the first cold email' },
+  { id: 'details', label: 'Choose contacts', description: 'Pick sender, audience, and time' },
+  { id: 'sequence', label: 'Review follow-ups', description: 'Add optional follow-ups and save' },
 ];
 const BUILDER_MODULES = [
   { type: 'text', label: 'Text', icon: TextCursor },
@@ -53,6 +54,23 @@ function createTextBlock(overrides = {}) {
     color: '#201a16',
     fontSize: 17,
     paddingTop: 18,
+    paddingBottom: 18,
+    ...overrides,
+  };
+}
+
+function createHeaderBlock(overrides = {}) {
+  return {
+    id: blockId('header'),
+    type: 'header',
+    logoText: 'BM',
+    eyebrow: 'Professional outreach',
+    title: 'BakhMail',
+    subtitle: 'Thoughtful campaigns with a clean, branded presentation.',
+    backgroundColor: '#fffdf8',
+    accentColor: '#171411',
+    textColor: '#201a16',
+    paddingTop: 16,
     paddingBottom: 18,
     ...overrides,
   };
@@ -96,16 +114,44 @@ function createDividerBlock(overrides = {}) {
   };
 }
 
+function createFooterBlock(overrides = {}) {
+  return {
+    id: blockId('footer'),
+    type: 'footer',
+    companyName: 'BakhMail',
+    note: 'Thank you for your time. If this is relevant, I would be glad to share more details.',
+    websiteUrl: 'https://example.com',
+    instagramUrl: 'https://instagram.com/example',
+    tiktokUrl: 'https://tiktok.com/@example',
+    emailAddress: 'hello@example.com',
+    phoneNumber: '+1 (555) 000-0000',
+    addressLine: '123 Business Street, City, Country',
+    contactLine: 'Reply to this email if you would like to continue the conversation.',
+    backgroundColor: '#fffaf3',
+    textColor: '#5f564d',
+    accentColor: '#171411',
+    paddingTop: 14,
+    paddingBottom: 16,
+    ...overrides,
+  };
+}
+
 function defaultBuilderBlocks() {
   return [
-    createImageBlock(),
     createTextBlock({
-      content: 'Upgrade your workflow today.\n\nWelcome to the future of email marketing. Our professional builder helps you create beautiful, high-converting emails in minutes, not hours.',
-      fontSize: 18,
-      paddingTop: 24,
-      paddingBottom: 16,
+      content: 'Hi {{first_name}},\n\nI\'m reaching out because many businesses lose opportunities when their online presence does not clearly show what they do or build trust quickly.\n\nA professional website can help you attract better leads, improve credibility, and make it easier for customers to choose your business with confidence.',
+      fontSize: 17,
+      paddingTop: 12,
+      paddingBottom: 12,
     }),
-    createButtonBlock({ label: 'Get started now', href: 'https://example.com/start' }),
+    createTextBlock({
+      content: 'If improving your online presence is a priority right now, I can share a simple idea tailored to your business and where your current website or brand experience may be losing attention.',
+      fontSize: 17,
+      paddingTop: 0,
+      paddingBottom: 12,
+    }),
+    createButtonBlock({ label: 'Request a quick idea', href: 'https://example.com' }),
+    createFooterBlock(),
   ];
 }
 
@@ -147,8 +193,21 @@ function sanitizeText(value) {
     .replace(/'/g, '&#039;');
 }
 
+function sanitizeUrl(value) {
+  const url = String(value || '').trim();
+
+  if (!url) return '';
+
+  if (/^(https?:\/\/|mailto:|tel:)/i.test(url)) {
+    return sanitizeText(url);
+  }
+
+  return sanitizeText(`https://${url}`);
+}
+
 function buildTemplateHtml(blocks) {
-  const content = blocks
+  const normalizedBlocks = ensureBuilderStructure(blocks);
+  const content = normalizedBlocks
     .map((block) => {
       const commonPadding = `padding:${block.paddingTop ?? 0}px 0 ${block.paddingBottom ?? 0}px;`;
 
@@ -169,19 +228,40 @@ function buildTemplateHtml(blocks) {
         return `<div style="${commonPadding}"><hr style="border:none; border-top:1px solid ${block.color || '#ddd3c4'};" /></div>`;
       }
 
+      if (block.type === 'footer') {
+        const websiteUrl = sanitizeUrl(block.websiteUrl || '');
+        const instagramUrl = sanitizeUrl(block.instagramUrl || '');
+        const tiktokUrl = sanitizeUrl(block.tiktokUrl || '');
+        const emailHref = block.emailAddress ? sanitizeUrl(`mailto:${block.emailAddress}`) : '';
+        const phoneHref = block.phoneNumber ? sanitizeUrl(`tel:${block.phoneNumber}`) : '';
+
+        return `<div style="${commonPadding}"><div style="border-top:1px solid #e4d8c6;padding-top:16px;color:${block.textColor || '#5f564d'};"><div style="font-size:13px;font-weight:700;color:${block.accentColor || '#171411'};">${sanitizeText(block.companyName || '')}</div><div style="margin-top:8px;font-size:13px;line-height:1.7;">${sanitizeText(block.note || '')}</div><div style="margin-top:10px;font-size:12px;line-height:1.7;"><div><strong>Website:</strong> ${websiteUrl ? `<a href="${websiteUrl}" style="color:${block.accentColor || '#171411'};text-decoration:underline;">${sanitizeText(block.websiteUrl || '')}</a>` : ''}</div><div><strong>Instagram:</strong> ${instagramUrl ? `<a href="${instagramUrl}" style="color:${block.accentColor || '#171411'};text-decoration:underline;">${sanitizeText(block.instagramUrl || '')}</a>` : ''}</div><div><strong>TikTok:</strong> ${tiktokUrl ? `<a href="${tiktokUrl}" style="color:${block.accentColor || '#171411'};text-decoration:underline;">${sanitizeText(block.tiktokUrl || '')}</a>` : ''}</div><div><strong>Email:</strong> ${emailHref ? `<a href="${emailHref}" style="color:${block.accentColor || '#171411'};text-decoration:underline;">${sanitizeText(block.emailAddress || '')}</a>` : sanitizeText(block.emailAddress || '')}</div><div><strong>Phone:</strong> ${phoneHref ? `<a href="${phoneHref}" style="color:${block.accentColor || '#171411'};text-decoration:underline;">${sanitizeText(block.phoneNumber || '')}</a>` : sanitizeText(block.phoneNumber || '')}</div><div><strong>Address:</strong> ${sanitizeText(block.addressLine || '')}</div></div><div style="margin-top:10px;font-size:12px;line-height:1.6;">${sanitizeText(block.contactLine || '')}</div></div></div>`;
+      }
+
       return '';
     })
     .join('');
 
-  return `<div style="max-width:640px;margin:0 auto;padding:24px;background:#fffaf3;font-family:Manrope,Arial,sans-serif;color:#201a16;">${content}</div>`;
+  return `<div style="width:100%;margin:0;padding:16px;background:#f4efe6;font-family:Manrope,Arial,sans-serif;color:#201a16;"><div style="max-width:640px;margin:0 auto;padding:20px;background:#fffaf3;border-radius:28px;">${content}</div></div>`;
 }
 
 function buildTemplateText(blocks) {
-  return blocks
-    .map((block) => {
-      if (block.type === 'text') return block.content || '';
-      if (block.type === 'button') return `${block.label || 'Call to action'}: ${block.href || ''}`.trim();
-      if (block.type === 'divider') return '----------------';
+    return ensureBuilderStructure(blocks)
+      .map((block) => {
+        if (block.type === 'text') return block.content || '';
+        if (block.type === 'button') return `${block.label || 'Call to action'}: ${block.href || ''}`.trim();
+        if (block.type === 'divider') return '----------------';
+      if (block.type === 'footer') return [
+        block.companyName,
+        block.note,
+        block.websiteUrl ? `Website: ${block.websiteUrl}` : '',
+        block.instagramUrl ? `Instagram: ${block.instagramUrl}` : '',
+        block.tiktokUrl ? `TikTok: ${block.tiktokUrl}` : '',
+        block.emailAddress ? `Email: ${block.emailAddress}` : '',
+        block.phoneNumber ? `Phone: ${block.phoneNumber}` : '',
+        block.addressLine ? `Address: ${block.addressLine}` : '',
+        block.contactLine,
+      ].filter(Boolean).join('\n');
       return '';
     })
     .filter(Boolean)
@@ -190,7 +270,7 @@ function buildTemplateText(blocks) {
 
 function ensureBuilderSettings(campaign) {
   const existingBlocks = campaign.settings?.builder_blocks;
-  const blocks = Array.isArray(existingBlocks) && existingBlocks.length ? existingBlocks : defaultBuilderBlocks();
+  const blocks = Array.isArray(existingBlocks) && existingBlocks.length ? ensureBuilderStructure(existingBlocks) : defaultBuilderBlocks();
 
   return {
     ...campaign,
@@ -203,6 +283,17 @@ function ensureBuilderSettings(campaign) {
       builder_viewport: campaign.settings?.builder_viewport || 'desktop',
     },
   };
+}
+
+function ensureBuilderStructure(blocks) {
+  const safeBlocks = Array.isArray(blocks) ? blocks.filter(Boolean) : [];
+  const nonStructural = safeBlocks.filter((block) => !['header', 'footer'].includes(block.type));
+  const existingFooter = safeBlocks.find((block) => block.type === 'footer');
+
+  return [
+    ...nonStructural,
+    existingFooter ? { ...createFooterBlock(), ...existingFooter } : createFooterBlock(),
+  ];
 }
 
 function SortableStep({ step, onChange, onRemove }) {
@@ -258,6 +349,106 @@ function SortableStep({ step, onChange, onRemove }) {
   );
 }
 
+function DraggableBuilderModule({ module, onAdd }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `module:${module.type}`,
+    data: { kind: 'builder-module', moduleType: module.type },
+  });
+  const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
+  const Icon = module.icon;
+
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      className={`campaign-builder-module ${isDragging ? 'campaign-builder-module--dragging' : ''}`}
+      style={style}
+      onClick={() => onAdd(module.type)}
+      {...listeners}
+      {...attributes}
+    >
+      <Icon size={17} />
+      <span>{module.label}</span>
+    </button>
+  );
+}
+
+function SortableEmailBlock({ block, selected, onSelectBlock }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+    id: block.id,
+    data: { kind: 'builder-block', blockId: block.id, blockType: block.type },
+  });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      style={style}
+      className={`campaign-email-block campaign-email-block--${block.type} ${selected ? 'campaign-email-block--selected' : ''}`}
+      onClick={() => onSelectBlock(block.id)}
+      {...attributes}
+      {...listeners}
+    >
+      {block.type === 'image' ? <img src={block.src} alt={block.alt || 'Campaign visual'} className="campaign-email-block__image" /> : null}
+      {block.type === 'text' ? (
+        <div
+          className="campaign-email-block__text"
+          style={{ textAlign: block.align, color: block.color, fontSize: `${block.fontSize}px`, paddingTop: block.paddingTop, paddingBottom: block.paddingBottom }}
+        >
+          {block.content.split('\n').map((line, index) => (
+            <p key={`${block.id}-${index}`}>{line}</p>
+          ))}
+        </div>
+      ) : null}
+      {block.type === 'button' ? (
+        <div className="campaign-email-block__button-shell" style={{ textAlign: block.align, paddingTop: block.paddingTop, paddingBottom: block.paddingBottom }}>
+          <span className="campaign-email-block__button" style={{ backgroundColor: block.backgroundColor, color: block.textColor }}>
+            {block.label}
+          </span>
+        </div>
+      ) : null}
+      {block.type === 'divider' ? (
+        <div className="campaign-email-block__divider-shell" style={{ paddingTop: block.paddingTop, paddingBottom: block.paddingBottom }}>
+          <span className="campaign-email-block__divider" style={{ backgroundColor: block.color }} />
+        </div>
+      ) : null}
+      {block.type === 'footer' ? (
+        <div
+          className="campaign-email-block__footer"
+          style={{ backgroundColor: block.backgroundColor, color: block.textColor, paddingTop: block.paddingTop, paddingBottom: block.paddingBottom }}
+        >
+          <strong style={{ color: block.accentColor }}>{block.companyName}</strong>
+          <p>{block.note}</p>
+          <div className="campaign-email-block__footer-meta">
+            {block.websiteUrl ? <span>Website: {block.websiteUrl}</span> : null}
+            {block.instagramUrl ? <span>Instagram: {block.instagramUrl}</span> : null}
+            {block.tiktokUrl ? <span>TikTok: {block.tiktokUrl}</span> : null}
+            {block.emailAddress ? <span>Email: {block.emailAddress}</span> : null}
+            {block.phoneNumber ? <span>Phone: {block.phoneNumber}</span> : null}
+            {block.addressLine ? <span>Address: {block.addressLine}</span> : null}
+          </div>
+          <span>{block.contactLine}</span>
+        </div>
+      ) : null}
+    </button>
+  );
+}
+
+function BuilderDropzone() {
+  const { isOver, setNodeRef } = useDroppable({
+    id: 'builder-dropzone',
+    data: { kind: 'builder-dropzone' },
+  });
+
+  return (
+    <div ref={setNodeRef} className={`campaign-builder-dropzone ${isOver ? 'campaign-builder-dropzone--active' : ''}`}>
+      <Plus size={16} />
+      <span>Drag a block here or click a block type on the left</span>
+    </div>
+  );
+}
+
 function EmailBlockCanvas({ blocks, selectedBlockId, onSelectBlock, viewport }) {
   return (
     <div className={`campaign-builder-canvas campaign-builder-canvas--${viewport}`}>
@@ -266,43 +457,20 @@ function EmailBlockCanvas({ blocks, selectedBlockId, onSelectBlock, viewport }) 
         <span />
         <span />
       </div>
-      <div className="campaign-builder-canvas__body">
-        {blocks.map((block) => {
-          const selected = selectedBlockId === block.id;
-
-          return (
-            <button
+      <SortableContext items={blocks.map((block) => block.id)} strategy={verticalListSortingStrategy}>
+        <div className="campaign-builder-canvas__body">
+          {blocks.map((block) => (
+            <SortableEmailBlock
               key={block.id}
-              type="button"
-              className={`campaign-email-block campaign-email-block--${block.type} ${selected ? 'campaign-email-block--selected' : ''}`}
-              onClick={() => onSelectBlock(block.id)}
-            >
-              {block.type === 'image' ? <img src={block.src} alt={block.alt || 'Campaign visual'} className="campaign-email-block__image" /> : null}
-              {block.type === 'text' ? (
-                <div
-                  className="campaign-email-block__text"
-                  style={{ textAlign: block.align, color: block.color, fontSize: `${block.fontSize}px`, paddingTop: block.paddingTop, paddingBottom: block.paddingBottom }}
-                >
-                  {block.content.split('\n').map((line, index) => (
-                    <p key={`${block.id}-${index}`}>{line}</p>
-                  ))}
-                </div>
-              ) : null}
-              {block.type === 'button' ? (
-                <div className="campaign-email-block__button-shell" style={{ textAlign: block.align, paddingTop: block.paddingTop, paddingBottom: block.paddingBottom }}>
-                  <span className="campaign-email-block__button" style={{ backgroundColor: block.backgroundColor, color: block.textColor }}>
-                    {block.label}
-                  </span>
-                </div>
-              ) : null}
-              {block.type === 'divider' ? (
-                <div className="campaign-email-block__divider-shell" style={{ paddingTop: block.paddingTop, paddingBottom: block.paddingBottom }}>
-                  <span className="campaign-email-block__divider" style={{ backgroundColor: block.color }} />
-                </div>
-              ) : null}
-            </button>
-          );
-        })}
+              block={block}
+              selected={selectedBlockId === block.id}
+              onSelectBlock={onSelectBlock}
+            />
+          ))}
+        </div>
+      </SortableContext>
+      <div className="campaign-builder-canvas__footer">
+        <BuilderDropzone />
       </div>
     </div>
   );
@@ -312,6 +480,7 @@ export function CampaignsPage() {
   const [campaigns, setCampaigns] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [filters, setFilters] = useState({ tags: [], groups: [] });
+  const [savedTemplate, setSavedTemplate] = useState({ header: null, footer: null, auto_apply: false });
   const [modalOpen, setModalOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewHtml, setPreviewHtml] = useState('');
@@ -319,6 +488,9 @@ export function CampaignsPage() {
   const [selectedBlockId, setSelectedBlockId] = useState(null);
   const [aiBrief, setAiBrief] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
+  const [testEmail, setTestEmail] = useState('');
+  const [testMessageTarget, setTestMessageTarget] = useState('opening');
+  const [testSending, setTestSending] = useState(false);
   const [detailsAiBusy, setDetailsAiBusy] = useState(false);
   const [detailsInsights, setDetailsInsights] = useState(null);
   const [wizardStep, setWizardStep] = useState(0);
@@ -327,15 +499,17 @@ export function CampaignsPage() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   async function load() {
-    const [campaignResponse, accountResponse, contactResponse] = await Promise.all([
+    const [campaignResponse, accountResponse, contactResponse, templateResponse] = await Promise.all([
       api.get('/api/campaigns'),
       api.get('/api/email-accounts'),
       api.get('/api/contacts'),
+      api.get('/api/campaigns/builder-template'),
     ]);
 
     setCampaigns(campaignResponse.data || []);
     setAccounts(accountResponse.data || []);
     setFilters(contactResponse.filters || { tags: [], groups: [] });
+    setSavedTemplate(templateResponse.data || { header: null, footer: null, auto_apply: false });
   }
 
   useEffect(() => {
@@ -354,21 +528,23 @@ export function CampaignsPage() {
   const scheduleMode = form.scheduled_at ? 'later' : 'now';
 
   function syncBuilder(nextBlocks, extraSettings = {}) {
+    const structuredBlocks = ensureBuilderStructure(nextBlocks);
+
     setForm((current) => ({
       ...current,
       builder_type: 'visual-blocks',
-      template_html: buildTemplateHtml(nextBlocks),
-      template_text: buildTemplateText(nextBlocks),
+      template_html: buildTemplateHtml(structuredBlocks),
+      template_text: buildTemplateText(structuredBlocks),
       settings: {
         ...(current.settings || {}),
         ...extraSettings,
-        builder_blocks: nextBlocks,
+        builder_blocks: structuredBlocks,
       },
     }));
   }
 
   function openNewModal() {
-    const nextCampaign = createEmptyCampaign();
+    const nextCampaign = applySavedTemplateToCampaign(createEmptyCampaign(), savedTemplate);
     setEditingId(null);
     setForm(nextCampaign);
     setSelectedBlockId(nextCampaign.settings.builder_blocks[0]?.id ?? null);
@@ -406,7 +582,7 @@ export function CampaignsPage() {
     }));
   }
 
-  function onDragEnd(event) {
+  function onStepDragEnd(event) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
@@ -414,10 +590,10 @@ export function CampaignsPage() {
       const oldIndex = current.steps.findIndex((step) => step.id === active.id);
       const newIndex = current.steps.findIndex((step) => step.id === over.id);
       return { ...current, steps: arrayMove(current.steps, oldIndex, newIndex) };
-    });
-  }
+      });
+    }
 
-  function addBuilderBlock(type) {
+  function createBuilderBlock(type) {
     let newBlock = null;
 
     if (type === 'text') newBlock = createTextBlock();
@@ -425,9 +601,16 @@ export function CampaignsPage() {
     if (type === 'button') newBlock = createButtonBlock();
     if (type === 'divider') newBlock = createDividerBlock();
 
+    return newBlock;
+  }
+
+  function addBuilderBlock(type, insertAt = builderBlocks.length) {
+    const newBlock = createBuilderBlock(type);
+
     if (!newBlock) return;
 
-    const nextBlocks = [...builderBlocks, newBlock];
+    const nextBlocks = [...builderBlocks];
+    nextBlocks.splice(Math.max(0, Math.min(insertAt, nextBlocks.length)), 0, newBlock);
     syncBuilder(nextBlocks);
     setSelectedBlockId(newBlock.id);
   }
@@ -439,8 +622,154 @@ export function CampaignsPage() {
     syncBuilder(nextBlocks);
   }
 
+  function onBuilderDragEnd(event) {
+    const { active, over } = event;
+
+    if (!over) return;
+
+    const activeId = String(active.id);
+    const overId = String(over.id);
+
+    if (activeId.startsWith('module:')) {
+      const moduleType = activeId.replace('module:', '');
+      const insertIndex = overId === 'builder-dropzone'
+        ? builderBlocks.length
+        : builderBlocks.findIndex((block) => block.id === overId);
+
+      addBuilderBlock(moduleType, insertIndex === -1 ? builderBlocks.length : insertIndex);
+      return;
+    }
+
+    if (activeId === overId) return;
+
+    const oldIndex = builderBlocks.findIndex((block) => block.id === activeId);
+    const newIndex = overId === 'builder-dropzone'
+      ? builderBlocks.length - 1
+      : builderBlocks.findIndex((block) => block.id === overId);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    syncBuilder(arrayMove(builderBlocks, oldIndex, newIndex));
+  }
+
+  function applySavedTemplateToCampaign(campaign, template = savedTemplate) {
+    if (!template?.footer) {
+      return campaign;
+    }
+
+    const existingBlocks = ensureBuilderStructure(campaign.settings?.builder_blocks || defaultBuilderBlocks());
+    const nextBlocks = existingBlocks.map((block) => {
+      if (block.type === 'footer' && template.footer && (template.auto_apply || !editingId)) {
+        return { ...block, ...template.footer, id: block.id };
+      }
+
+      return block;
+    });
+
+    return {
+      ...campaign,
+      template_html: buildTemplateHtml(nextBlocks),
+      template_text: buildTemplateText(nextBlocks),
+      settings: {
+        ...(campaign.settings || {}),
+        builder_blocks: nextBlocks,
+        builder_viewport: campaign.settings?.builder_viewport || 'desktop',
+      },
+    };
+  }
+
+  function inferBrandName({ campaignName = '', brief = '' }) {
+    const normalizedCampaignName = String(campaignName || '').trim();
+    const normalizedBrief = String(brief || '').trim();
+    const briefMatch = normalizedBrief.match(/\bfor\s+(.+?)\s+(targeting|for|to)\b/i);
+
+    if (briefMatch?.[1]) {
+      return briefMatch[1].trim().replace(/[.,;:]+$/, '');
+    }
+
+    if (normalizedCampaignName) {
+      return normalizedCampaignName.split(/campaign/i)[0].trim() || normalizedCampaignName;
+    }
+
+    return 'Your Brand';
+  }
+
+  function personalizeStructuralBlocks(blocks, context = {}) {
+    const brandName = inferBrandName(context);
+
+    return ensureBuilderStructure(blocks).map((block) => {
+        if (block.type === 'footer') {
+          return {
+            ...block,
+            companyName: brandName,
+            note: 'Thank you for your time.',
+            websiteUrl: block.websiteUrl || '',
+            instagramUrl: block.instagramUrl || '',
+            tiktokUrl: block.tiktokUrl || '',
+            emailAddress: block.emailAddress || '',
+            phoneNumber: block.phoneNumber || '',
+            addressLine: block.addressLine || '',
+            contactLine: block.contactLine || 'Reply to this email to continue the conversation.',
+            backgroundColor: '#fffaf3',
+            textColor: '#5f564d',
+          accentColor: block.accentColor || '#171411',
+        };
+      }
+
+      return block;
+    });
+  }
+
+  async function saveCurrentTemplate() {
+    const footer = builderBlocks.find((block) => block.type === 'footer') || null;
+
+    try {
+      const response = await api.put('/api/campaigns/builder-template', {
+        header: null,
+        footer,
+        auto_apply: savedTemplate.auto_apply,
+      });
+
+      setSavedTemplate(response.data || { header: null, footer: null, auto_apply: false });
+      toast.success('Footer saved for reuse');
+    } catch (error) {
+      toast.error(error.payload?.message || 'Could not save builder template');
+    }
+  }
+
+  async function toggleAutoApplySavedTemplate(nextValue) {
+    try {
+      const response = await api.put('/api/campaigns/builder-template', {
+        header: null,
+        footer: savedTemplate.footer,
+        auto_apply: nextValue,
+      });
+
+      setSavedTemplate(response.data || { header: null, footer: null, auto_apply: nextValue });
+      toast.success(nextValue ? 'Saved template will auto-apply to new campaigns' : 'Auto-apply disabled');
+    } catch (error) {
+      toast.error(error.payload?.message || 'Could not update template preference');
+    }
+  }
+
+  function applySavedTemplateToCurrentBuilder() {
+    if (!savedTemplate.footer) {
+      toast.error('Save a footer first');
+      return;
+    }
+
+    const nextForm = applySavedTemplateToCampaign(form, { ...savedTemplate, auto_apply: true });
+    setForm(nextForm);
+    setSelectedBlockId(nextForm.settings?.builder_blocks?.[0]?.id ?? null);
+    toast.success('Saved footer applied');
+  }
+
   function removeSelectedBlock() {
     if (!selectedBlock) return;
+    if (selectedBlock.type === 'footer') {
+      toast.error('Footer is built into this template. Edit it instead of removing it.');
+      return;
+    }
 
     const nextBlocks = builderBlocks.filter((block) => block.id !== selectedBlock.id);
     syncBuilder(nextBlocks.length ? nextBlocks : defaultBuilderBlocks());
@@ -450,6 +779,11 @@ export function CampaignsPage() {
   async function generateCampaignWithAi() {
     if (!aiBrief.trim()) {
       toast.error('Add a short campaign brief first');
+      return;
+    }
+
+    if (aiBrief.trim().length > MAX_AI_BRIEF_CHARS) {
+      toast.error(`AI brief is too long. Keep it under ${MAX_AI_BRIEF_CHARS} characters.`);
       return;
     }
 
@@ -469,6 +803,14 @@ export function CampaignsPage() {
       }
 
       const blocks = draft.builder_blocks || [];
+      const structuredBlocks = savedTemplate.footer
+        ? ensureBuilderStructure(blocks)
+        : personalizeStructuralBlocks(blocks, {
+            campaignName: draft.name || form.name,
+            subject: draft.subject || form.subject,
+            previewText: draft.preview_text || form.preview_text,
+            brief: aiBrief,
+          });
 
       setForm((current) => ({
         ...current,
@@ -476,18 +818,18 @@ export function CampaignsPage() {
         subject: draft.subject || current.subject,
         preview_text: draft.preview_text ?? current.preview_text,
         builder_type: 'visual-blocks',
-        template_html: buildTemplateHtml(blocks),
-        template_text: buildTemplateText(blocks),
+        template_html: buildTemplateHtml(structuredBlocks),
+        template_text: buildTemplateText(structuredBlocks),
         settings: {
           ...(current.settings || {}),
-          builder_blocks: blocks,
+          builder_blocks: structuredBlocks,
         },
         steps: (draft.steps || []).map((step) => ({
           ...step,
           id: step.id || `step-${crypto.randomUUID()}`,
         })),
       }));
-      setSelectedBlockId(blocks[0]?.id ?? null);
+      setSelectedBlockId(structuredBlocks[0]?.id ?? null);
       toast.success(`Campaign draft generated with ${response.data?.model || 'AI'}`);
     } catch (error) {
       toast.error(error.payload?.message || error.message || 'Could not generate campaign draft');
@@ -561,13 +903,48 @@ export function CampaignsPage() {
     }
   }
 
+  async function sendTestEmail() {
+    if (!form.selected_email_account_ids?.length) {
+      toast.error('Choose a sending mailbox first');
+      return;
+    }
+
+    if (testEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(testEmail.trim())) {
+      toast.error('Enter a valid test email address');
+      return;
+    }
+
+    setTestSending(true);
+
+    try {
+      await api.post('/api/campaigns/test-draft', {
+        to_email: testEmail.trim() || undefined,
+        selected_email_account_ids: form.selected_email_account_ids,
+        subject: form.subject || 'Test campaign email',
+        template_html: buildTemplateHtml(builderBlocks),
+        template_text: buildTemplateText(builderBlocks),
+        steps: orderedSteps,
+        message_target: testMessageTarget,
+      });
+
+      toast.success(`Test email sent${testEmail.trim() ? ` to ${testEmail.trim()}` : ''}`);
+    } catch (error) {
+      toast.error(error.payload?.message || error.message || 'Could not send test email');
+    } finally {
+      setTestSending(false);
+    }
+  }
+
   async function startEdit(id) {
     try {
       const response = await api.get(`/api/campaigns/${id}`);
       const campaign = ensureBuilderSettings(response.data);
+      const builderBlocks = ensureBuilderStructure(campaign.settings?.builder_blocks || []);
       setEditingId(id);
       setForm({
         ...campaign,
+        template_html: buildTemplateHtml(builderBlocks),
+        template_text: buildTemplateText(builderBlocks),
         scheduled_at: campaign.scheduled_at ? campaign.scheduled_at.slice(0, 16) : '',
         audience_filters: {
           search: '',
@@ -576,9 +953,14 @@ export function CampaignsPage() {
           status: 'active',
           ...(campaign.audience_filters || {}),
         },
+        settings: {
+          ...(campaign.settings || {}),
+          builder_blocks: builderBlocks,
+          builder_viewport: campaign.settings?.builder_viewport || 'desktop',
+        },
         steps: (campaign.steps || []).map((step) => ({ ...step, id: String(step.id) })),
       });
-      setSelectedBlockId(campaign.settings.builder_blocks[0]?.id ?? null);
+      setSelectedBlockId(builderBlocks[0]?.id ?? null);
       setWizardStep(0);
       setModalOpen(true);
     } catch {
@@ -722,11 +1104,11 @@ export function CampaignsPage() {
               <div className="flex flex-col gap-4 border-b border-slate-200 pb-4">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                   <div>
-                    <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Step 1</p>
-                    <h3 className="mt-2 text-2xl font-semibold text-slate-950">Build the opening email first.</h3>
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-                      Start with the core email. Once the layout and message are ready, move to campaign details, audience, scheduling, and follow-up flow.
-                    </p>
+                      <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Step 1</p>
+                      <h3 className="mt-2 text-2xl font-semibold text-slate-950">Write your first cold email.</h3>
+                      <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+                        Start with the main email you want people to receive first. Keep it simple: clear offer, clear audience, clear call to action.
+                      </p>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
@@ -751,21 +1133,25 @@ export function CampaignsPage() {
 
                 <div className="campaign-ai-bar">
                   <label className="field-shell campaign-ai-bar__input">
-                    <span className="field-label">AI campaign brief</span>
+                    <span className="field-label">What should this cold email say?</span>
                     <textarea
                       className="field-input min-h-24"
                       value={aiBrief}
                       onChange={(event) => setAiBrief(event.target.value)}
-                      placeholder="Describe the offer, audience, tone, CTA, and any angle you want. Example: generate a cold outbound campaign for a B2B email warmup tool targeting SaaS founders."
+                      placeholder="Example: Write a cold email for Bakhtech Solutions to business owners who need a better website. Keep it professional and conversational. Focus on getting more leads, stronger credibility, and more sales. End with a simple CTA asking if they want a quick website idea or audit."
                     />
+                    <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
+                      <span>Keep it short: offer, audience, tone, and CTA.</span>
+                      <span>{aiBrief.trim().length}/{MAX_AI_BRIEF_CHARS}</span>
+                    </div>
                   </label>
                   <div className="campaign-ai-bar__actions">
                     <p className="text-sm leading-6 text-slate-500">
-                      AI can draft the campaign name, subject, preview text, builder blocks, and follow-up steps. You can refine everything before moving on.
+                      AI will draft the email, subject line, and follow-ups for you. You can edit everything after it generates.
                     </p>
                     <button className="primary-button" type="button" onClick={generateCampaignWithAi} disabled={aiBusy}>
                       <Sparkles size={16} />
-                      {aiBusy ? 'Generating...' : 'Generate with AI'}
+                      {aiBusy ? 'Generating...' : 'Generate email draft'}
                     </button>
                   </div>
                 </div>
@@ -776,23 +1162,32 @@ export function CampaignsPage() {
                   <div>
                     <p className="campaign-builder-sidebar__label">Content blocks</p>
                     <div className="campaign-builder-module-grid">
-                      {BUILDER_MODULES.map((module) => {
-                        const Icon = module.icon;
-
-                        return (
-                          <button key={module.type} type="button" className="campaign-builder-module" onClick={() => addBuilderBlock(module.type)}>
-                            <Icon size={17} />
-                            <span>{module.label}</span>
-                          </button>
-                        );
-                      })}
+                        {BUILDER_MODULES.map((module) => (
+                          <DraggableBuilderModule key={module.type} module={module} onAdd={addBuilderBlock} />
+                        ))}
                     </div>
                   </div>
 
-                  <div className="campaign-builder-sidebar__panel">
-                    <p className="campaign-builder-sidebar__label">Saved modules</p>
-                    <div className="campaign-builder-sidebar__empty">No saved modules yet.</div>
-                  </div>
+                    <div className="campaign-builder-sidebar__panel">
+                      <p className="campaign-builder-sidebar__label">Saved modules</p>
+                        <div className="space-y-3">
+                        <div className="campaign-summary-tile">
+                          <span>Footer</span>
+                          <strong>{savedTemplate.footer?.companyName || 'Not saved'}</strong>
+                        </div>
+                        <button className="ghost-button w-full justify-center" type="button" onClick={applySavedTemplateToCurrentBuilder}>
+                          Apply saved footer
+                        </button>
+                        <label className="flex items-center gap-3 text-sm text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(savedTemplate.auto_apply)}
+                            onChange={(event) => toggleAutoApplySavedTemplate(event.target.checked)}
+                          />
+                          Auto-apply to new campaigns
+                        </label>
+                      </div>
+                    </div>
 
                   <div className="campaign-builder-sidebar__panel">
                     <p className="campaign-builder-sidebar__label">Personalization</p>
@@ -806,18 +1201,16 @@ export function CampaignsPage() {
                   </div>
                 </aside>
 
-                <div className="campaign-builder-stage">
-                  <EmailBlockCanvas
-                    blocks={builderBlocks}
-                    selectedBlockId={selectedBlock?.id || null}
-                    onSelectBlock={setSelectedBlockId}
-                    viewport={form.settings?.builder_viewport || 'desktop'}
-                  />
-                  <div className="campaign-builder-dropzone">
-                    <Plus size={16} />
-                    <span>Add another block from the left</span>
-                  </div>
-                </div>
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onBuilderDragEnd}>
+                    <div className="campaign-builder-stage">
+                      <EmailBlockCanvas
+                        blocks={builderBlocks}
+                        selectedBlockId={selectedBlock?.id || null}
+                        onSelectBlock={setSelectedBlockId}
+                        viewport={form.settings?.builder_viewport || 'desktop'}
+                      />
+                    </div>
+                  </DndContext>
 
                 <aside className="campaign-builder-sidebar">
                   <div className="campaign-builder-sidebar__panel">
@@ -828,16 +1221,16 @@ export function CampaignsPage() {
                           {selectedBlock ? `${selectedBlock.type[0].toUpperCase()}${selectedBlock.type.slice(1)} block` : 'Select a block'}
                         </h4>
                       </div>
-                      {selectedBlock ? (
-                        <button className="ghost-button !p-3" type="button" onClick={removeSelectedBlock}>
-                          <Trash2 size={16} />
-                        </button>
-                      ) : null}
+                        {selectedBlock ? (
+                          <button className="ghost-button !p-3" type="button" onClick={removeSelectedBlock}>
+                            <Trash2 size={16} />
+                          </button>
+                        ) : null}
                     </div>
 
                     {selectedBlock ? (
                       <div className="space-y-3">
-                        {selectedBlock.type === 'text' ? (
+                          {selectedBlock.type === 'text' ? (
                           <>
                             <label className="field-shell">
                               <span className="field-label">Text content</span>
@@ -921,6 +1314,57 @@ export function CampaignsPage() {
                           </label>
                         ) : null}
 
+                        {selectedBlock.type === 'footer' ? (
+                          <>
+                            <label className="field-shell">
+                              <span className="field-label">Company name</span>
+                              <input className="field-input" value={selectedBlock.companyName} onChange={(event) => updateSelectedBlock({ companyName: event.target.value })} />
+                            </label>
+                              <label className="field-shell">
+                                <span className="field-label">Footer note</span>
+                                <textarea className="field-input min-h-24" value={selectedBlock.note} onChange={(event) => updateSelectedBlock({ note: event.target.value })} />
+                              </label>
+                              <label className="field-shell">
+                                <span className="field-label">Website URL</span>
+                                <input className="field-input" value={selectedBlock.websiteUrl || ''} onChange={(event) => updateSelectedBlock({ websiteUrl: event.target.value })} />
+                              </label>
+                              <label className="field-shell">
+                                <span className="field-label">Instagram URL</span>
+                                <input className="field-input" value={selectedBlock.instagramUrl || ''} onChange={(event) => updateSelectedBlock({ instagramUrl: event.target.value })} />
+                              </label>
+                              <label className="field-shell">
+                                <span className="field-label">TikTok URL</span>
+                                <input className="field-input" value={selectedBlock.tiktokUrl || ''} onChange={(event) => updateSelectedBlock({ tiktokUrl: event.target.value })} />
+                              </label>
+                              <label className="field-shell">
+                                <span className="field-label">Contact email</span>
+                                <input className="field-input" value={selectedBlock.emailAddress || ''} onChange={(event) => updateSelectedBlock({ emailAddress: event.target.value })} />
+                              </label>
+                              <label className="field-shell">
+                                <span className="field-label">Phone number</span>
+                                <input className="field-input" value={selectedBlock.phoneNumber || ''} onChange={(event) => updateSelectedBlock({ phoneNumber: event.target.value })} />
+                              </label>
+                              <label className="field-shell">
+                                <span className="field-label">Address</span>
+                                <textarea className="field-input min-h-24" value={selectedBlock.addressLine || ''} onChange={(event) => updateSelectedBlock({ addressLine: event.target.value })} />
+                              </label>
+                              <label className="field-shell">
+                                <span className="field-label">Contact line</span>
+                                <input className="field-input" value={selectedBlock.contactLine} onChange={(event) => updateSelectedBlock({ contactLine: event.target.value })} />
+                              </label>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <label className="field-shell">
+                                <span className="field-label">Background</span>
+                                <input className="field-input" type="color" value={selectedBlock.backgroundColor} onChange={(event) => updateSelectedBlock({ backgroundColor: event.target.value })} />
+                              </label>
+                              <label className="field-shell">
+                                <span className="field-label">Accent</span>
+                                <input className="field-input" type="color" value={selectedBlock.accentColor} onChange={(event) => updateSelectedBlock({ accentColor: event.target.value })} />
+                              </label>
+                            </div>
+                          </>
+                        ) : null}
+
                         <div className="grid gap-3 sm:grid-cols-2">
                           <label className="field-shell">
                             <span className="field-label">Padding top</span>
@@ -931,6 +1375,11 @@ export function CampaignsPage() {
                             <input className="field-input" type="number" min="0" max="80" value={selectedBlock.paddingBottom ?? 0} onChange={(event) => updateSelectedBlock({ paddingBottom: Number(event.target.value) })} />
                           </label>
                         </div>
+                        {selectedBlock.type === 'footer' ? (
+                          <button className="ghost-button w-full justify-center" type="button" onClick={saveCurrentTemplate}>
+                            Save footer for reuse
+                          </button>
+                        ) : null}
                       </div>
                     ) : (
                       <div className="campaign-builder-sidebar__empty">Choose a block on the canvas to edit its content and layout.</div>
@@ -948,12 +1397,12 @@ export function CampaignsPage() {
                   <div className="campaign-details-header">
                     <div>
                       <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Step 2</p>
-                      <h3 className="mt-2 text-2xl font-semibold text-slate-950">Campaign details</h3>
-                      <p className="mt-2 text-sm leading-6 text-slate-500">Set the campaign name, email copy, recipients, and delivery timing.</p>
+                      <h3 className="mt-2 text-2xl font-semibold text-slate-950">Choose who sends it and who gets it.</h3>
+                      <p className="mt-2 text-sm leading-6 text-slate-500">Set a name for yourself, choose the sending mailbox, choose the contacts, and decide when to send.</p>
                     </div>
                     <button className="primary-button" type="button" onClick={assistCampaignDetailsWithAi} disabled={detailsAiBusy}>
                       <Sparkles size={16} />
-                      {detailsAiBusy ? 'Refining...' : 'Refine with AI'}
+                      {detailsAiBusy ? 'Polishing...' : 'Polish with AI'}
                     </button>
                   </div>
                 </div>
@@ -965,12 +1414,12 @@ export function CampaignsPage() {
                       <input className="field-input" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
                     </label>
                     <label className="field-shell">
-                      <span className="field-label">Subject line</span>
+                      <span className="field-label">Email subject</span>
                       <input className="field-input" value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })} />
                       <span className="text-xs text-slate-400">{form.subject.length}/255</span>
                     </label>
                     <label className="field-shell">
-                      <span className="field-label">Preview text</span>
+                      <span className="field-label">Preview text (optional)</span>
                       <textarea className="field-input min-h-24" value={form.preview_text} onChange={(event) => setForm({ ...form, preview_text: event.target.value })} />
                       <span className="text-xs text-slate-400">{form.preview_text.length}/255</span>
                     </label>
@@ -979,9 +1428,9 @@ export function CampaignsPage() {
 
                 <div className="campaign-details-grid">
                   <div className="surface-card-muted p-5">
-                    <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Senders</p>
+                    <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Send from</p>
                     <label className="field-shell mt-4">
-                      <span className="field-label">Sender mailbox pool</span>
+                      <span className="field-label">Mailbox</span>
                       <select
                         className="field-input campaign-multi-select"
                         multiple
@@ -1003,10 +1452,10 @@ export function CampaignsPage() {
                   </div>
 
                   <div className="surface-card-muted p-5">
-                    <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Recipients</p>
+                    <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Send to</p>
                     <div className="mt-4 grid gap-4">
                       <label className="field-shell">
-                        <span className="field-label">Tag segments</span>
+                        <span className="field-label">Contact tags (optional)</span>
                         <select
                           className="field-input campaign-multi-select"
                           multiple
@@ -1029,7 +1478,7 @@ export function CampaignsPage() {
                         </select>
                       </label>
                       <label className="field-shell">
-                        <span className="field-label">Group segments</span>
+                        <span className="field-label">Contact groups (optional)</span>
                         <select
                           className="field-input campaign-multi-select"
                           multiple
@@ -1056,28 +1505,28 @@ export function CampaignsPage() {
                 </div>
 
                 <div className="surface-card-muted p-5">
-                  <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Delivery</p>
+                  <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">When should this send?</p>
                   <div className="mt-4 grid gap-4 md:grid-cols-2">
                     <button
                       type="button"
                       className={`campaign-choice-card ${scheduleMode === 'now' ? 'campaign-choice-card--active' : ''}`}
                       onClick={() => setForm({ ...form, scheduled_at: '' })}
                     >
-                      <strong>Send now</strong>
-                      <span>Launch immediately.</span>
+                      <strong>Start now</strong>
+                      <span>Queue this campaign right away.</span>
                     </button>
                     <button
                       type="button"
                       className={`campaign-choice-card ${scheduleMode === 'later' ? 'campaign-choice-card--active' : ''}`}
                       onClick={() => !form.scheduled_at && setForm({ ...form, scheduled_at: new Date().toISOString().slice(0, 16) })}
                     >
-                      <strong>Schedule</strong>
-                      <span>Choose a future time.</span>
+                      <strong>Send later</strong>
+                      <span>Choose a future date and time.</span>
                     </button>
                   </div>
                   {scheduleMode === 'later' ? (
                     <label className="field-shell mt-4">
-                      <span className="field-label">Send time</span>
+                      <span className="field-label">Send date and time</span>
                       <input className="field-input" type="datetime-local" value={form.scheduled_at} onChange={(event) => setForm({ ...form, scheduled_at: event.target.value })} />
                     </label>
                   ) : null}
@@ -1125,14 +1574,14 @@ export function CampaignsPage() {
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Step 3</p>
-                      <h3 className="mt-2 text-2xl font-semibold text-slate-950">Finalize the follow-up flow</h3>
+                      <h3 className="mt-2 text-2xl font-semibold text-slate-950">Review your follow-ups</h3>
                       <p className="mt-2 text-sm leading-6 text-slate-500">
-                        Add the remaining step copy, delays, and sequencing rules before saving the campaign.
+                        Follow-ups are optional. Keep them short, clear, and spaced out so your campaign feels natural.
                       </p>
                     </div>
                     <button className="ghost-button" type="button" onClick={addStep}>
                       <MailPlus size={16} />
-                      Add step
+                      Add follow-up
                     </button>
                   </div>
                 </div>
@@ -1145,13 +1594,13 @@ export function CampaignsPage() {
                     <div>
                       <p className="text-sm font-semibold text-slate-950">Builder notes</p>
                       <p className="mt-1 text-sm leading-6 text-slate-500">
-                        The visual builder controls the main campaign email. Each sequence step still keeps its own HTML body so follow-ups can stay shorter and more direct.
+                        The builder controls the first email. Follow-up emails below can be shorter and more direct.
                       </p>
                     </div>
                   </div>
                 </div>
 
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onStepDragEnd}>
                   <SortableContext items={form.steps.map((step) => step.id)} strategy={verticalListSortingStrategy}>
                     <div className="space-y-4">
                       {orderedSteps.map((step) => (
@@ -1180,8 +1629,38 @@ export function CampaignsPage() {
 
           <section className="surface-card-muted p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-sm text-slate-500">
-                Step {wizardStep + 1} of {CAMPAIGN_WIZARD_STEPS.length}: {CAMPAIGN_WIZARD_STEPS[wizardStep].label}
+              <div className="flex-1 space-y-3">
+                <div className="text-sm text-slate-500">
+                  Step {wizardStep + 1} of {CAMPAIGN_WIZARD_STEPS.length}: {CAMPAIGN_WIZARD_STEPS[wizardStep].label}
+                </div>
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_13rem_11rem_auto]">
+                  <label className="field-shell">
+                    <span className="field-label">Send test to</span>
+                    <input
+                      className="field-input"
+                      value={testEmail}
+                      onChange={(event) => setTestEmail(event.target.value)}
+                      placeholder="Leave blank to send to your login email"
+                    />
+                  </label>
+                  <label className="field-shell">
+                    <span className="field-label">Message</span>
+                    <select className="field-input" value={testMessageTarget} onChange={(event) => setTestMessageTarget(event.target.value)}>
+                      <option value="opening">Opening email</option>
+                      {orderedSteps.map((step) => (
+                        <option key={step.id} value={`step:${step.id}`}>
+                          {step.name || 'Follow-up'}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="text-xs leading-6 text-slate-500 lg:self-end">
+                    Sends using the first selected mailbox.
+                  </div>
+                  <button className="ghost-button lg:self-end" type="button" onClick={sendTestEmail} disabled={testSending}>
+                    {testSending ? 'Sending test...' : 'Send test email'}
+                  </button>
+                </div>
               </div>
               <div className="flex flex-wrap justify-end gap-3">
                 <button className="ghost-button" type="button" onClick={() => setModalOpen(false)}>

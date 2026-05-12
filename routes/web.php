@@ -56,6 +56,9 @@ Route::prefix('api')->group(function (): void {
 
         Route::post('/campaigns/generate', [CampaignController::class, 'generate'])->name('api.campaigns.generate');
         Route::post('/campaigns/assist-details', [CampaignController::class, 'assistDetails'])->name('api.campaigns.assist-details');
+        Route::post('/campaigns/test-draft', [CampaignController::class, 'testDraft'])->name('api.campaigns.test-draft');
+        Route::get('/campaigns/builder-template', [CampaignController::class, 'builderTemplate'])->name('api.campaigns.builder-template');
+        Route::put('/campaigns/builder-template', [CampaignController::class, 'saveBuilderTemplate'])->name('api.campaigns.builder-template.save');
         Route::post('/campaigns/{campaign}/launch', [CampaignController::class, 'launch'])->name('api.campaigns.launch');
         Route::get('/campaigns/{campaign}/preview', [CampaignController::class, 'preview'])->name('api.campaigns.preview');
         Route::apiResource('campaigns', CampaignController::class);
