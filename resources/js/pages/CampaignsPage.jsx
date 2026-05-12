@@ -163,7 +163,7 @@ function createEmptyCampaign() {
     subject: '',
     preview_text: '',
     builder_type: 'visual-blocks',
-    template_html: buildTemplateHtml(builderBlocks),
+    template_html: buildTemplateHtml(builderBlocks, { emailBackgroundColor: '#fffaf3' }),
     template_text: buildTemplateText(builderBlocks),
     selected_email_account_ids: [],
     audience_filters: { search: '', group_ids: [], tag_ids: [], status: 'active' },
@@ -171,6 +171,7 @@ function createEmptyCampaign() {
     settings: {
       builder_blocks: builderBlocks,
       builder_viewport: 'desktop',
+      email_background_color: '#fffaf3',
     },
     steps: [
       {
@@ -205,8 +206,9 @@ function sanitizeUrl(value) {
   return sanitizeText(`https://${url}`);
 }
 
-function buildTemplateHtml(blocks) {
+function buildTemplateHtml(blocks, options = {}) {
   const normalizedBlocks = ensureBuilderStructure(blocks);
+  const emailBackgroundColor = options.emailBackgroundColor || '#fffaf3';
   const content = normalizedBlocks
     .map((block) => {
       const commonPadding = `padding:${block.paddingTop ?? 0}px 0 ${block.paddingBottom ?? 0}px;`;
@@ -242,7 +244,7 @@ function buildTemplateHtml(blocks) {
     })
     .join('');
 
-  return `<div style="width:100%;margin:0;padding:0;background:#fffaf3;font-family:Manrope,Arial,sans-serif;color:#201a16;"><div style="max-width:640px;margin:0 auto;padding:16px 12px;background:#fffaf3;">${content}</div></div>`;
+  return `<div style="width:100%;margin:0;padding:0;background:${emailBackgroundColor};font-family:Manrope,Arial,sans-serif;color:#201a16;">${content}</div>`;
 }
 
 function buildTemplateText(blocks) {
@@ -275,12 +277,13 @@ function ensureBuilderSettings(campaign) {
   return {
     ...campaign,
     builder_type: campaign.builder_type || 'visual-blocks',
-    template_html: campaign.template_html || buildTemplateHtml(blocks),
+    template_html: campaign.template_html || buildTemplateHtml(blocks, { emailBackgroundColor: campaign.settings?.email_background_color || '#fffaf3' }),
     template_text: campaign.template_text || buildTemplateText(blocks),
     settings: {
       ...(campaign.settings || {}),
       builder_blocks: blocks,
       builder_viewport: campaign.settings?.builder_viewport || 'desktop',
+      email_background_color: campaign.settings?.email_background_color || '#fffaf3',
     },
   };
 }
@@ -449,9 +452,9 @@ function BuilderDropzone() {
   );
 }
 
-function EmailBlockCanvas({ blocks, selectedBlockId, onSelectBlock, viewport }) {
+function EmailBlockCanvas({ blocks, selectedBlockId, onSelectBlock, viewport, backgroundColor }) {
   return (
-    <div className={`campaign-builder-canvas campaign-builder-canvas--${viewport}`}>
+    <div className={`campaign-builder-canvas campaign-builder-canvas--${viewport}`} style={{ backgroundColor: backgroundColor || '#fffaf3' }}>
       <div className="campaign-builder-canvas__chrome">
         <span />
         <span />
@@ -530,13 +533,13 @@ export function CampaignsPage() {
   function syncBuilder(nextBlocks, extraSettings = {}) {
     const structuredBlocks = ensureBuilderStructure(nextBlocks);
 
-    setForm((current) => ({
-      ...current,
-      builder_type: 'visual-blocks',
-      template_html: buildTemplateHtml(structuredBlocks),
-      template_text: buildTemplateText(structuredBlocks),
-      settings: {
-        ...(current.settings || {}),
+      setForm((current) => ({
+        ...current,
+        builder_type: 'visual-blocks',
+        template_html: buildTemplateHtml(structuredBlocks, { emailBackgroundColor: current.settings?.email_background_color || '#fffaf3' }),
+        template_text: buildTemplateText(structuredBlocks),
+        settings: {
+          ...(current.settings || {}),
         ...extraSettings,
         builder_blocks: structuredBlocks,
       },
@@ -669,11 +672,11 @@ export function CampaignsPage() {
       return block;
     });
 
-    return {
-      ...campaign,
-      template_html: buildTemplateHtml(nextBlocks),
-      template_text: buildTemplateText(nextBlocks),
-      settings: {
+      return {
+        ...campaign,
+        template_html: buildTemplateHtml(nextBlocks, { emailBackgroundColor: campaign.settings?.email_background_color || '#fffaf3' }),
+        template_text: buildTemplateText(nextBlocks),
+        settings: {
         ...(campaign.settings || {}),
         builder_blocks: nextBlocks,
         builder_viewport: campaign.settings?.builder_viewport || 'desktop',
@@ -821,7 +824,7 @@ export function CampaignsPage() {
         subject: draft.subject || current.subject,
         preview_text: draft.preview_text ?? current.preview_text,
         builder_type: 'visual-blocks',
-        template_html: buildTemplateHtml(structuredBlocks),
+        template_html: buildTemplateHtml(structuredBlocks, { emailBackgroundColor: current.settings?.email_background_color || '#fffaf3' }),
         template_text: buildTemplateText(structuredBlocks),
         settings: {
           ...(current.settings || {}),
@@ -880,7 +883,7 @@ export function CampaignsPage() {
     const payload = {
       ...form,
       builder_type: 'visual-blocks',
-      template_html: buildTemplateHtml(builderBlocks),
+      template_html: buildTemplateHtml(builderBlocks, { emailBackgroundColor: form.settings?.email_background_color || '#fffaf3' }),
       template_text: buildTemplateText(builderBlocks),
       scheduled_at: form.scheduled_at || null,
       steps: orderedSteps,
@@ -928,7 +931,7 @@ export function CampaignsPage() {
         to_email: testEmail.trim() || undefined,
         selected_email_account_ids: senderIds,
         subject: form.subject || 'Test campaign email',
-        template_html: buildTemplateHtml(builderBlocks),
+        template_html: buildTemplateHtml(builderBlocks, { emailBackgroundColor: form.settings?.email_background_color || '#fffaf3' }),
         template_text: buildTemplateText(builderBlocks),
         steps: orderedSteps,
         message_target: testMessageTarget,
@@ -945,26 +948,27 @@ export function CampaignsPage() {
   async function startEdit(id) {
     try {
       const response = await api.get(`/api/campaigns/${id}`);
-      const campaign = ensureBuilderSettings(response.data);
-      const builderBlocks = ensureBuilderStructure(campaign.settings?.builder_blocks || []);
-      setEditingId(id);
-      setForm({
-        ...campaign,
-        template_html: buildTemplateHtml(builderBlocks),
-        template_text: buildTemplateText(builderBlocks),
-        scheduled_at: campaign.scheduled_at ? campaign.scheduled_at.slice(0, 16) : '',
-        audience_filters: {
+        const campaign = ensureBuilderSettings(response.data);
+        const builderBlocks = ensureBuilderStructure(campaign.settings?.builder_blocks || []);
+        setEditingId(id);
+        setForm({
+          ...campaign,
+        template_html: buildTemplateHtml(builderBlocks, { emailBackgroundColor: campaign.settings?.email_background_color || '#fffaf3' }),
+          template_text: buildTemplateText(builderBlocks),
+          scheduled_at: campaign.scheduled_at ? campaign.scheduled_at.slice(0, 16) : '',
+          audience_filters: {
           search: '',
           group_ids: [],
           tag_ids: [],
           status: 'active',
           ...(campaign.audience_filters || {}),
         },
-        settings: {
-          ...(campaign.settings || {}),
-          builder_blocks: builderBlocks,
-          builder_viewport: campaign.settings?.builder_viewport || 'desktop',
-        },
+          settings: {
+            ...(campaign.settings || {}),
+            builder_blocks: builderBlocks,
+            builder_viewport: campaign.settings?.builder_viewport || 'desktop',
+            email_background_color: campaign.settings?.email_background_color || '#fffaf3',
+          },
         steps: (campaign.steps || []).map((step) => ({ ...step, id: String(step.id) })),
       });
       setSelectedBlockId(builderBlocks[0]?.id ?? null);
@@ -1206,6 +1210,26 @@ export function CampaignsPage() {
                       ))}
                     </div>
                   </div>
+
+                  <div className="campaign-builder-sidebar__panel">
+                    <p className="campaign-builder-sidebar__label">Email style</p>
+                    <label className="field-shell mt-4">
+                      <span className="field-label">Mail background color</span>
+                      <input
+                        className="field-input"
+                        type="color"
+                        value={form.settings?.email_background_color || '#fffaf3'}
+                        onChange={(event) => setForm((current) => ({
+                          ...current,
+                          template_html: buildTemplateHtml(current.settings?.builder_blocks || builderBlocks, { emailBackgroundColor: event.target.value }),
+                          settings: {
+                            ...(current.settings || {}),
+                            email_background_color: event.target.value,
+                          },
+                        }))}
+                      />
+                    </label>
+                  </div>
                 </aside>
 
                   <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onBuilderDragEnd}>
@@ -1215,6 +1239,7 @@ export function CampaignsPage() {
                         selectedBlockId={selectedBlock?.id || null}
                         onSelectBlock={setSelectedBlockId}
                         viewport={form.settings?.builder_viewport || 'desktop'}
+                        backgroundColor={form.settings?.email_background_color || '#fffaf3'}
                       />
                     </div>
                   </DndContext>
