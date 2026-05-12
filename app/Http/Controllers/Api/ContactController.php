@@ -102,6 +102,11 @@ class ContactController extends Controller
         return response()->json(['status' => 'deleted']);
     }
 
+    public function remove(Request $request, Contact $contact): JsonResponse
+    {
+        return $this->destroy($request, $contact);
+    }
+
     public function import(Request $request): JsonResponse
     {
         $request->validate([

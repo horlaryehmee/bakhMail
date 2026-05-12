@@ -95,11 +95,11 @@ export function ContactsPage() {
 
   async function destroyContact(id) {
     try {
-      await api.delete(`/api/contacts/${id}`);
+      await api.post(`/api/contacts/${id}/remove`, {});
       toast.success('Contact removed');
       loadContacts(search);
-    } catch {
-      toast.error('Could not delete contact');
+    } catch (error) {
+      toast.error(error.payload?.message || error.message || 'Could not delete contact');
     }
   }
 
