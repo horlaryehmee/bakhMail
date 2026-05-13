@@ -495,10 +495,15 @@ class ContactController extends Controller
     {
         return [
             'id' => $log->id,
+            'conversation_thread_id' => $log->conversation_thread_id,
             'direction' => $log->direction,
             'event_type' => $log->event_type,
             'subject' => $log->subject,
             'body_preview' => $log->body_preview,
+            'sender_email' => $log->sender_email,
+            'recipient_email' => $log->recipient_email,
+            'provider_message_id' => $log->provider_message_id,
+            'in_reply_to' => $log->in_reply_to,
             'sent_at' => $log->sent_at?->toIso8601String(),
             'opened_at' => $log->opened_at?->toIso8601String(),
             'clicked_at' => $log->clicked_at?->toIso8601String(),

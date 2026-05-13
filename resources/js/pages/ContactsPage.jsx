@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Download, MailPlus, Plus, Search, Upload, Users } from 'lucide-react';
+import { Download, MailPlus, MessageSquareText, Plus, Search, Upload, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Modal } from '../components/Modal';
@@ -39,6 +39,9 @@ export function ContactsPage() {
   const [payload, setPayload] = useState(null);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [selectedContact, setSelectedContact] = useState(null);
   const [form, setForm] = useState(createEmptyContact());
   const [editingId, setEditingId] = useState(null);
 
@@ -109,6 +112,21 @@ export function ContactsPage() {
         contact,
       },
     });
+  }
+
+  async function openHistory(contact) {
+    setHistoryOpen(true);
+    setHistoryLoading(true);
+    setSelectedContact(contact);
+
+    try {
+      const response = await api.get(`/api/contacts/${contact.id}`);
+      setSelectedContact(response.data || contact);
+    } catch (error) {
+      toast.error(error.payload?.message || error.message || 'Could not load contact activity');
+    } finally {
+      setHistoryLoading(false);
+    }
   }
 
   async function destroyContact(id) {
@@ -289,6 +307,9 @@ export function ContactsPage() {
                           <button className="ghost-button" type="button" onClick={() => startQuickMail(contact)}>
                             Email
                           </button>
+                          <button className="ghost-button" type="button" onClick={() => openHistory(contact)}>
+                            History
+                          </button>
                           <button className="ghost-button" type="button" onClick={() => startEdit(contact)}>
                             Edit
                           </button>
@@ -375,6 +396,144 @@ export function ContactsPage() {
             <textarea className="field-input min-h-28" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
           </label>
         </form>
+      </Modal>
+
+      <Modal
+        open={historyOpen}
+        title={selectedContact ? `${selectedContact.full_name || selectedContact.email}` : 'Contact history'}
+        width="max-w-5xl"
+        onClose={() => {
+          setHistoryOpen(false);
+          setSelectedContact(null);
+        }}
+        footer={
+          selectedContact ? (
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => {
+                  const latestThreadId = selectedContact?.email_logs?.find((log) => log.conversation_thread_id)?.conversation_thread_id;
+                  if (!latestThreadId) {
+                    return;
+                  }
+
+                  setHistoryOpen(false);
+                  navigate('/conversations', {
+                    state: {
+                      threadId: latestThreadId,
+                    },
+                  });
+                }}
+                disabled={!selectedContact?.email_logs?.some((log) => log.conversation_thread_id)}
+              >
+                Open reply thread
+              </button>
+              <button className="primary-button" type="button" onClick={() => startQuickMail(selectedContact)}>
+                Send new email
+              </button>
+            </div>
+          ) : null
+        }
+      >
+        {historyLoading ? (
+          <div className="empty-panel p-6 text-center text-sm">Loading contact activity...</div>
+        ) : selectedContact ? (
+          <div className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="surface-card-muted rounded-[22px] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Replies</p>
+                <p className="mt-3 text-3xl font-semibold text-slate-950">
+                  {selectedContact.email_logs?.filter((log) => log.direction === 'inbound' && log.event_type === 'replied').length || 0}
+                </p>
+              </div>
+              <div className="surface-card-muted rounded-[22px] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Bounces</p>
+                <p className="mt-3 text-3xl font-semibold text-slate-950">
+                  {selectedContact.email_logs?.filter((log) => log.event_type === 'bounced').length || 0}
+                </p>
+              </div>
+              <div className="surface-card-muted rounded-[22px] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Last contacted</p>
+                <p className="mt-3 text-sm font-medium text-slate-700">
+                  {selectedContact.last_contacted_at ? new Date(selectedContact.last_contacted_at).toLocaleString() : 'Never'}
+                </p>
+              </div>
+              <div className="surface-card-muted rounded-[22px] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Mailbox status</p>
+                <p className="mt-3">
+                  <StatusBadge status={selectedContact.status} />
+                </p>
+              </div>
+            </div>
+
+            <div className="surface-card-muted rounded-[26px] p-4 sm:p-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
+                  <MessageSquareText size={18} />
+                </div>
+                <div>
+                  <p className="eyebrow !text-[0.64rem] !tracking-[0.24em]">Mail timeline</p>
+                  <h3 className="text-xl font-semibold text-slate-950">Outbound and inbound activity</h3>
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-4">
+                {selectedContact.email_logs?.length ? (
+                  selectedContact.email_logs.map((log) => {
+                    const isInbound = log.direction === 'inbound';
+                    const badge = trackingState(log);
+
+                    return (
+                      <div
+                        key={log.id}
+                        className={`rounded-[24px] border px-4 py-4 sm:px-5 ${
+                          isInbound ? 'border-emerald-200 bg-emerald-50/70' : 'border-slate-200 bg-white'
+                        }`}
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <StatusBadge status={isInbound ? 'reply' : 'outbound'} tone={isInbound ? 'emerald' : 'blue'} />
+                              {badge ? <StatusBadge status={badge.label} tone={badge.tone} /> : null}
+                            </div>
+                            <h4 className="text-lg font-semibold text-slate-950">{log.subject || 'No subject'}</h4>
+                            <p className="text-sm text-slate-500">
+                              {log.sender_email || 'Unknown sender'} to {log.recipient_email || 'Unknown recipient'}
+                            </p>
+                          </div>
+                          <div className="text-sm text-slate-500">
+                            {log.sent_at ? new Date(log.sent_at).toLocaleString() : 'Pending'}
+                          </div>
+                        </div>
+
+                        <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-slate-600">
+                          {log.body_preview || 'No preview available yet.'}
+                        </p>
+
+                        <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium text-slate-500">
+                          {log.opened_at ? <span className="rounded-full bg-blue-100 px-3 py-1 text-blue-700">Opened</span> : null}
+                          {log.clicked_at ? <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">Clicked</span> : null}
+                          {log.conversation_thread_id ? (
+                            <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
+                              Thread #{log.conversation_thread_id}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="empty-panel p-6 text-center text-sm">
+                    No email activity has been recorded for this contact yet.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="empty-panel p-6 text-center text-sm">No contact selected.</div>
+        )}
       </Modal>
     </div>
   );

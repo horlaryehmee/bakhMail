@@ -71,6 +71,7 @@ Route::prefix('api')->group(function (): void {
 
         Route::get('/conversations', [ConversationController::class, 'index'])->name('api.conversations.index');
         Route::get('/conversations/{thread}', [ConversationController::class, 'show'])->name('api.conversations.show');
+        Route::post('/conversations/{thread}/reply', [ConversationController::class, 'reply'])->name('api.conversations.reply');
 
         Route::get('/analytics', [AnalyticsController::class, 'index'])->name('api.analytics.index');
         Route::get('/analytics/export/csv', [AnalyticsController::class, 'exportCsv'])->name('api.analytics.export.csv');
