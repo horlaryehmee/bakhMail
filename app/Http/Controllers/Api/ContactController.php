@@ -10,6 +10,7 @@ use App\Models\EmailAccount;
 use App\Models\EmailLog;
 use App\Models\SuppressionEntry;
 use App\Models\Tag;
+use App\Models\User;
 use App\Services\ActivityLogger;
 use App\Services\ContactImportService;
 use App\Services\DynamicSmtpMailer;
@@ -102,20 +103,79 @@ class ContactController extends Controller
         return response()->json(['data' => $this->serializeContact($contact)]);
     }
 
+    public function save(Request $request, int $contact): JsonResponse
+    {
+        $ownedContact = $this->resolveOwnedContact($request->user(), $contact);
+        $validated = $this->validatePayload($request, $ownedContact->id);
+
+        DB::table('contacts')
+            ->where('id', $ownedContact->id)
+            ->where('user_id', $request->user()->id)
+            ->update([
+                'first_name' => $validated['first_name'] ?? null,
+                'last_name' => $validated['last_name'] ?? null,
+                'email' => strtolower($validated['email']),
+                'company' => $validated['company'] ?? null,
+                'job_title' => $validated['job_title'] ?? null,
+                'phone' => $validated['phone'] ?? null,
+                'website' => $validated['website'] ?? null,
+                'location' => $validated['location'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+                'status' => $validated['status'] ?? 'active',
+                'custom_fields' => isset($validated['custom_fields']) ? json_encode($validated['custom_fields']) : null,
+                'updated_at' => now(),
+            ]);
+
+        $ownedContact = $this->resolveOwnedContact($request->user(), $contact);
+        $this->syncTaxonomy($request, $ownedContact);
+        $ownedContact->load(['tags', 'groups']);
+
+        $this->activityLogger->log($request->user(), 'contacts.updated', $ownedContact, $request, description: "Updated contact {$ownedContact->email}.");
+
+        return response()->json(['data' => $this->serializeContact($ownedContact)]);
+    }
+
     public function destroy(Request $request, Contact $contact): JsonResponse
     {
         abort_unless($contact->user_id === $request->user()->id, 404);
-        $email = $contact->email;
-        $contact->delete();
-
-        $this->activityLogger->log($request->user(), 'contacts.deleted', Contact::class, $request, ['email' => $email], "Deleted contact {$email}.");
-
-        return response()->json(['status' => 'deleted']);
+        return $this->deleteOwnedContact($request, $contact);
     }
 
-    public function remove(Request $request, Contact $contact): JsonResponse
+    public function remove(Request $request, int $contact): JsonResponse
     {
-        return $this->destroy($request, $contact);
+        $ownedContact = $this->resolveOwnedContact($request->user(), $contact);
+
+        return $this->deleteOwnedContact($request, $ownedContact);
+    }
+
+    public function clear(Request $request): JsonResponse
+    {
+        $deleted = 0;
+
+        DB::transaction(function () use ($request, &$deleted): void {
+            $contacts = Contact::query()
+                ->where('user_id', $request->user()->id)
+                ->get(['id', 'email']);
+
+            foreach ($contacts as $contact) {
+                $this->deleteOwnedContact($request, $contact, logActivity: false);
+                $deleted++;
+            }
+        });
+
+        $this->activityLogger->log(
+            $request->user(),
+            'contacts.cleared',
+            Contact::class,
+            $request,
+            ['deleted_count' => $deleted],
+            "Cleared {$deleted} contacts."
+        );
+
+        return response()->json([
+            'status' => 'cleared',
+            'deleted_count' => $deleted,
+        ]);
     }
 
     public function import(Request $request): JsonResponse
@@ -443,6 +503,39 @@ class ContactController extends Controller
             'opened_at' => $log->opened_at?->toIso8601String(),
             'clicked_at' => $log->clicked_at?->toIso8601String(),
         ];
+    }
+
+    private function resolveOwnedContact(User $user, int $contactId): Contact
+    {
+        return Contact::query()
+            ->where('user_id', $user->id)
+            ->findOrFail($contactId);
+    }
+
+    private function deleteOwnedContact(Request $request, Contact $contact, bool $logActivity = true): JsonResponse
+    {
+        $email = $contact->email;
+
+        DB::transaction(function () use ($contact): void {
+            DB::table('tracking_events')->where('contact_id', $contact->id)->delete();
+            DB::table('contact_tag')->where('contact_id', $contact->id)->delete();
+            DB::table('contact_group_members')->where('contact_id', $contact->id)->delete();
+            DB::table('campaign_recipients')->where('contact_id', $contact->id)->delete();
+            DB::table('email_logs')->where('contact_id', $contact->id)->update([
+                'contact_id' => null,
+                'conversation_thread_id' => null,
+                'updated_at' => now(),
+            ]);
+            DB::table('conversation_threads')->where('contact_id', $contact->id)->delete();
+            DB::table('suppression_entries')->where('user_id', $contact->user_id)->where('email', $contact->email)->delete();
+            DB::table('contacts')->where('id', $contact->id)->delete();
+        });
+
+        if ($logActivity) {
+            $this->activityLogger->log($request->user(), 'contacts.deleted', Contact::class, $request, ['email' => $email], "Deleted contact {$email}.");
+        }
+
+        return response()->json(['status' => 'deleted']);
     }
 
 }

@@ -70,7 +70,7 @@ export function ContactsPage() {
 
     try {
       if (editingId) {
-        await api.patch(`/api/contacts/${editingId}`, body);
+        await api.post(`/api/contacts/${editingId}/save`, body);
         toast.success('Contact updated');
       } else {
         await api.post('/api/contacts', body);
@@ -113,7 +113,7 @@ export function ContactsPage() {
 
   async function destroyContact(id) {
     try {
-      await api.delete(`/api/contacts/${id}`);
+      await api.post(`/api/contacts/${id}/remove`, {});
       toast.success('Contact removed');
       loadContacts(search);
     } catch (error) {
