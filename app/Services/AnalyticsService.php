@@ -24,6 +24,15 @@ class AnalyticsService
                 ],
                 'timeline' => [],
                 'campaigns' => [],
+                'quick_mail' => [
+                    'totals' => [
+                        'sent' => 0,
+                        'replies' => 0,
+                        'bounces' => 0,
+                        'reply_rate' => 0,
+                    ],
+                    'messages' => [],
+                ],
             ];
         }
 
@@ -47,6 +56,7 @@ class AnalyticsService
             ],
             'timeline' => $this->timelineForUser($user),
             'campaigns' => $this->campaignPerformance($user),
+            'quick_mail' => $this->quickMailPerformance($user),
         ];
     }
 
@@ -135,16 +145,114 @@ class AnalyticsService
 
     public function exportRows(User $user): array
     {
-        return collect($this->campaignPerformance($user))
+        $campaignRows = collect($this->campaignPerformance($user))
             ->map(fn (array $row) => [
+                'type' => 'campaign',
                 'campaign' => $row['name'],
                 'status' => $row['status'],
                 'sent' => $row['sent'],
                 'replies' => $row['replies'],
                 'bounces' => $row['bounces'],
                 'reply_rate' => $row['reply_rate'],
-            ])
+            ]);
+
+        $quickMailRows = collect($this->quickMailPerformance($user)['messages'] ?? [])
+            ->map(fn (array $row) => [
+                'type' => 'quick_mail',
+                'campaign' => $row['contact_name'] ?: $row['recipient_email'],
+                'status' => $row['status'],
+                'sent' => $row['sent'],
+                'replies' => $row['replies'],
+                'bounces' => $row['bounces'],
+                'reply_rate' => $row['reply_rate'],
+            ]);
+
+        return $campaignRows
+            ->concat($quickMailRows)
             ->all();
+    }
+
+    public function quickMailPerformance(User $user): array
+    {
+        if (! Schema::hasTable('email_logs')) {
+            return [
+                'totals' => [
+                    'sent' => 0,
+                    'replies' => 0,
+                    'bounces' => 0,
+                    'reply_rate' => 0,
+                ],
+                'messages' => [],
+            ];
+        }
+
+        $quickMailSent = EmailLog::query()
+            ->where('user_id', $user->id)
+            ->whereNull('campaign_id')
+            ->where('direction', 'outbound')
+            ->where('event_type', 'sent');
+
+        $sent = (clone $quickMailSent)->count();
+        $threadIds = (clone $quickMailSent)->whereNotNull('conversation_thread_id')->pluck('conversation_thread_id')->unique()->values();
+
+        $replyLogs = EmailLog::query()
+            ->where('user_id', $user->id)
+            ->whereNull('campaign_id')
+            ->where('event_type', 'replied')
+            ->when($threadIds->isNotEmpty(), fn ($query) => $query->whereIn('conversation_thread_id', $threadIds));
+
+        $bounceLogs = EmailLog::query()
+            ->where('user_id', $user->id)
+            ->whereNull('campaign_id')
+            ->where('event_type', 'bounced')
+            ->when($threadIds->isNotEmpty(), fn ($query) => $query->whereIn('conversation_thread_id', $threadIds));
+
+        $messages = (clone $quickMailSent)
+            ->with(['contact', 'thread'])
+            ->latest('sent_at')
+            ->take(25)
+            ->get()
+            ->map(function (EmailLog $log): array {
+                $threadId = $log->conversation_thread_id;
+                $replies = EmailLog::query()
+                    ->where('user_id', $log->user_id)
+                    ->whereNull('campaign_id')
+                    ->where('event_type', 'replied')
+                    ->when($threadId, fn ($query) => $query->where('conversation_thread_id', $threadId))
+                    ->count();
+                $bounces = EmailLog::query()
+                    ->where('user_id', $log->user_id)
+                    ->whereNull('campaign_id')
+                    ->where('event_type', 'bounced')
+                    ->when($threadId, fn ($query) => $query->where('conversation_thread_id', $threadId))
+                    ->count();
+
+                return [
+                    'id' => $log->id,
+                    'contact_name' => $log->contact?->full_name,
+                    'recipient_email' => $log->recipient_email,
+                    'subject' => $log->subject,
+                    'sent_at' => $log->sent_at?->toIso8601String(),
+                    'status' => $bounces > 0 ? 'bounced' : ($replies > 0 ? 'replied' : 'sent'),
+                    'sent' => 1,
+                    'replies' => $replies,
+                    'bounces' => $bounces,
+                    'reply_rate' => $this->rate($replies > 0 ? 1 : 0, 1),
+                    'opened' => $log->opened_at !== null,
+                    'clicked' => $log->clicked_at !== null,
+                ];
+            })
+            ->all();
+
+        return [
+            'totals' => [
+                'sent' => $sent,
+                'replies' => $replyLogs->count(),
+                'bounces' => $bounceLogs->count(),
+                'reply_rate' => $this->rate($replyLogs->count(), $sent),
+            ],
+            'messages' => $messages,
+        ];
     }
 
     private function rate(int $numerator, int $denominator): float

@@ -25,7 +25,7 @@ class AnalyticsController extends Controller
 
         return response()->streamDownload(function () use ($rows): void {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['campaign', 'status', 'sent', 'replies', 'bounces', 'reply_rate']);
+            fputcsv($handle, ['type', 'campaign', 'status', 'sent', 'replies', 'bounces', 'reply_rate']);
 
             foreach ($rows as $row) {
                 fputcsv($handle, $row);
