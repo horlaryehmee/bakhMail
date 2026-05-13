@@ -56,6 +56,8 @@ Route::prefix('api')->group(function (): void {
         Route::post('/email-accounts/{emailAccount}/save', [EmailAccountController::class, 'save'])->name('api.email-accounts.save');
         Route::post('/email-accounts/{emailAccount}/remove', [EmailAccountController::class, 'remove'])->name('api.email-accounts.remove');
         Route::post('/email-accounts/{emailAccount}/test-connection', [EmailAccountController::class, 'testConnection'])->name('api.email-accounts.test-connection');
+        Route::post('/email-accounts/{emailAccount}/test-imap', [EmailAccountController::class, 'testImap'])->name('api.email-accounts.test-imap');
+        Route::post('/email-accounts/{emailAccount}/sync-replies', [EmailAccountController::class, 'syncReplies'])->name('api.email-accounts.sync-replies');
         Route::apiResource('email-accounts', EmailAccountController::class);
 
         Route::post('/campaigns/generate', [CampaignController::class, 'generate'])->name('api.campaigns.generate');

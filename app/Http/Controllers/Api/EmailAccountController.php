@@ -7,6 +7,7 @@ use App\Models\EmailAccount;
 use App\Services\ActivityLogger;
 use App\Services\DeliverabilityService;
 use App\Services\DynamicSmtpMailer;
+use App\Services\ReplySyncService;
 use App\Support\EmailAccountSchemaManager;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
@@ -20,6 +21,7 @@ class EmailAccountController extends Controller
     public function __construct(
         private readonly DeliverabilityService $deliverabilityService,
         private readonly DynamicSmtpMailer $dynamicSmtpMailer,
+        private readonly ReplySyncService $replySyncService,
         private readonly ActivityLogger $activityLogger,
         private readonly EmailAccountSchemaManager $schemaManager,
     ) {
@@ -162,6 +164,40 @@ class EmailAccountController extends Controller
         return $this->test($request, $emailAccount);
     }
 
+    public function testImap(Request $request, int $emailAccount): JsonResponse
+    {
+        $this->ensureSchemaReady();
+
+        $emailAccount = $this->resolveOwnedAccount($request, $emailAccount);
+
+        return response()->json([
+            'data' => $this->imapDiagnostics($emailAccount),
+        ]);
+    }
+
+    public function syncReplies(Request $request, int $emailAccount): JsonResponse
+    {
+        $this->ensureSchemaReady();
+
+        $emailAccount = $this->resolveOwnedAccount($request, $emailAccount);
+        $count = $this->replySyncService->syncAccount($emailAccount);
+
+        $this->activityLogger->log(
+            $request->user(),
+            'accounts.reply_sync_ran',
+            $emailAccount,
+            $request,
+            ['synced_count' => $count],
+            "Ran reply sync for {$emailAccount->email_address}."
+        );
+
+        return response()->json([
+            'status' => 'synced',
+            'count' => $count,
+            'imap' => $this->imapDiagnostics($emailAccount->fresh()),
+        ]);
+    }
+
     private function validatePayload(Request $request, ?int $ignoreId = null): array
     {
         $validated = $request->validate([
@@ -206,6 +242,8 @@ class EmailAccountController extends Controller
 
     private function serializeAccount(EmailAccount $account): array
     {
+        $imap = $this->imapDiagnostics($account);
+
         return [
             'id' => $account->id,
             'name' => $account->name,
@@ -234,6 +272,7 @@ class EmailAccountController extends Controller
             'sent_count' => $account->sent_count ?? 0,
             'smtp_configured' => $account->provider === 'php_mail' || (bool) ($account->smtp_host && $account->smtp_port),
             'imap_configured' => $account->hasImapConfiguration(),
+            'imap' => $imap,
         ];
     }
 
@@ -249,5 +288,88 @@ class EmailAccountController extends Controller
         } catch (ModelNotFoundException) {
             abort(404, 'Mailbox account not found.');
         }
+    }
+
+    private function imapDiagnostics(EmailAccount $account): array
+    {
+        $host = trim((string) $account->imap_host);
+        $resolves = $this->hostResolves($host);
+
+        if (! $account->hasImapConfiguration()) {
+            return [
+                'ready' => false,
+                'host_resolves' => $resolves,
+                'message' => 'IMAP is incomplete. Add host, port, and username.',
+            ];
+        }
+
+        if (! $resolves) {
+            return [
+                'ready' => false,
+                'host_resolves' => false,
+                'message' => 'IMAP host does not resolve. Replies cannot sync until this hostname is corrected.',
+            ];
+        }
+
+        if (blank($account->imap_password)) {
+            return [
+                'ready' => false,
+                'host_resolves' => true,
+                'message' => 'IMAP password is missing. Save the mailbox again with the password to enable reply sync.',
+            ];
+        }
+
+        $mailbox = sprintf(
+            '{%s:%d%s}INBOX',
+            $account->imap_host,
+            $account->imap_port,
+            match ($account->imap_encryption) {
+                'ssl' => '/imap/ssl',
+                'tls' => '/imap/tls',
+                default => '/imap/notls',
+            }
+        );
+
+        $warning = null;
+        set_error_handler(function (int $severity, string $message) use (&$warning): bool {
+            $warning = $message;
+
+            return true;
+        });
+
+        try {
+            $connection = imap_open($mailbox, $account->imap_username, $account->imap_password ?? '');
+        } finally {
+            restore_error_handler();
+        }
+
+        if ($connection === false) {
+            return [
+                'ready' => false,
+                'host_resolves' => true,
+                'message' => $warning ?: 'IMAP connection failed.',
+            ];
+        }
+
+        imap_close($connection);
+
+        return [
+            'ready' => true,
+            'host_resolves' => true,
+            'message' => 'IMAP connection is working and replies can sync.',
+        ];
+    }
+
+    private function hostResolves(string $host): bool
+    {
+        if ($host === '') {
+            return false;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return true;
+        }
+
+        return gethostbyname($host) !== $host;
     }
 }

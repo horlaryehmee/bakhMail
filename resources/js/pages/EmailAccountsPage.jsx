@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Radar, Send, ShieldCheck } from 'lucide-react';
+import { Inbox, Plus, Radar, RefreshCcw, Send, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Modal } from '../components/Modal';
 import { StatusBadge } from '../components/StatusBadge';
@@ -99,6 +99,26 @@ export function EmailAccountsPage() {
     }
   }
 
+  async function testImap(accountId) {
+    try {
+      const response = await api.post(`/api/email-accounts/${accountId}/test-imap`, {});
+      toast.success(response.data?.message || 'IMAP test completed');
+      load();
+    } catch (error) {
+      toast.error(error.payload?.message || error.message || 'IMAP test failed');
+    }
+  }
+
+  async function syncReplies(accountId) {
+    try {
+      const response = await api.post(`/api/email-accounts/${accountId}/sync-replies`, {});
+      toast.success(`Reply sync completed: ${response.count || 0} message(s)`);
+      load();
+    } catch (error) {
+      toast.error(error.payload?.message || error.message || 'Reply sync failed');
+    }
+  }
+
   async function removeAccount(accountId) {
     try {
       await api.post(`/api/email-accounts/${accountId}/remove`, {});
@@ -154,7 +174,7 @@ export function EmailAccountsPage() {
                   <th>Mailbox</th>
                   <th>Provider</th>
                   <th>Health</th>
-                  <th>Warm-up</th>
+                  <th>IMAP</th>
                   <th className="text-right">Actions</th>
                 </tr>
               </thead>
@@ -174,13 +194,29 @@ export function EmailAccountsPage() {
                         <StatusBadge status={`${account.health_score || 0} health`} tone={account.health_score >= 80 ? 'emerald' : account.health_score >= 60 ? 'amber' : 'rose'} />
                       </td>
                       <td>
-                        <StatusBadge status={account.warmup_enabled ? 'enabled' : 'disabled'} tone={account.warmup_enabled ? 'emerald' : 'slate'} />
+                        <div className="space-y-2">
+                          <StatusBadge
+                            status={account.imap?.ready ? 'ready' : 'issue'}
+                            tone={account.imap?.ready ? 'emerald' : 'rose'}
+                          />
+                          <div className="max-w-[240px] text-sm text-slate-500">
+                            {account.imap?.message || (account.imap_configured ? 'IMAP configured' : 'IMAP incomplete')}
+                          </div>
+                        </div>
                       </td>
                       <td>
                         <div className="flex justify-end gap-2">
                           <button className="ghost-button" type="button" onClick={() => sendTest(account.id)}>
                             <Send size={16} />
-                            Test
+                            SMTP
+                          </button>
+                          <button className="ghost-button" type="button" onClick={() => testImap(account.id)}>
+                            <Inbox size={16} />
+                            IMAP
+                          </button>
+                          <button className="ghost-button" type="button" onClick={() => syncReplies(account.id)}>
+                            <RefreshCcw size={16} />
+                            Sync
                           </button>
                           <button className="ghost-button" type="button" onClick={() => startEdit(account)}>
                             Edit
@@ -227,8 +263,8 @@ export function EmailAccountsPage() {
                   </div>
                   <div className="mt-4 grid gap-2 text-sm text-slate-600">
                     <div>SPF: {check.spf.status}</div>
-                    <div>DKIM: {check.dkim.status}</div>
-                    <div>DMARC: {check.dmarc.status}</div>
+                      <div>DKIM: {check.dkim.status}</div>
+                      <div>DMARC: {check.dmarc.status}</div>
                   </div>
                 </div>
               ))
