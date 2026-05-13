@@ -9,6 +9,7 @@ use App\Models\EmailLog;
 use App\Models\SuppressionEntry;
 use App\Models\Tag;
 use App\Notifications\SystemEventNotification;
+use Illuminate\Support\Facades\Log;
 
 class ReplySyncService
 {
@@ -39,8 +40,18 @@ class ReplySyncService
             return 0;
         }
 
+        if (! $this->isResolvableHost((string) $account->imap_host)) {
+            Log::warning('Reply sync skipped because IMAP host could not be resolved.', [
+                'email_account_id' => $account->id,
+                'imap_host' => $account->imap_host,
+                'email_address' => $account->email_address,
+            ]);
+
+            return 0;
+        }
+
         $mailbox = $this->mailboxPath($account);
-        $connection = @imap_open($mailbox, $account->imap_username, $account->imap_password ?? '');
+        $connection = $this->openMailbox($mailbox, $account);
 
         if (! $connection) {
             return 0;
@@ -148,6 +159,34 @@ class ReplySyncService
         return sprintf('{%s:%d%s}INBOX', $account->imap_host, $account->imap_port, $flag);
     }
 
+    private function openMailbox(string $mailbox, EmailAccount $account): mixed
+    {
+        $lastWarning = null;
+        set_error_handler(function (int $severity, string $message) use (&$lastWarning): bool {
+            $lastWarning = $message;
+
+            return true;
+        });
+
+        try {
+            $connection = imap_open($mailbox, $account->imap_username, $account->imap_password ?? '');
+        } finally {
+            restore_error_handler();
+        }
+
+        if (! $connection) {
+            Log::warning('Reply sync could not open IMAP mailbox.', [
+                'email_account_id' => $account->id,
+                'imap_host' => $account->imap_host,
+                'email_address' => $account->email_address,
+                'warning' => $lastWarning,
+                'imap_errors' => imap_errors() ?: [],
+            ]);
+        }
+
+        return $connection;
+    }
+
     private function headerAddress(object $headerInfo): string
     {
         $from = $headerInfo->from[0] ?? null;
@@ -160,6 +199,21 @@ class ReplySyncService
         preg_match('/^'.preg_quote($name, '/').':\s*(.+)$/mi', $headers, $matches);
 
         return trim($matches[1] ?? '');
+    }
+
+    private function isResolvableHost(string $host): bool
+    {
+        $host = trim($host);
+
+        if ($host === '') {
+            return false;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return true;
+        }
+
+        return gethostbyname($host) !== $host;
     }
 
     private function isBounce(string $fromAddress, string $subject, string $body): bool
