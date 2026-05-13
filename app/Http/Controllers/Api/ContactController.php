@@ -260,7 +260,9 @@ class ContactController extends Controller
 
             $htmlBody = trim((string) $validated['body_html']);
             $text = trim((string) ($validated['body_text'] ?? strip_tags($htmlBody)));
-            $html = $this->trackingService->decorate($log, $htmlBody);
+            $html = $this->trackingService->decorate($log, $htmlBody, [
+                'include_footer' => false,
+            ]);
             $headers = [];
             $lastMessageId = $thread->emailLogs()
                 ->whereNotNull('provider_message_id')

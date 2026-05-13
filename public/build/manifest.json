@@ -6,24 +6,24 @@
       "_api-Dk5sHoDI.js"
     ]
   },
-  "_AuthShell-Dr4cOi9u.js": {
-    "file": "assets/AuthShell-Dr4cOi9u.js",
+  "_AuthShell-Dswptfxw.js": {
+    "file": "assets/AuthShell-Dswptfxw.js",
     "name": "AuthShell",
     "imports": [
       "_api-Dk5sHoDI.js",
       "resources/js/app.jsx"
     ]
   },
-  "_MetricCard-AVXPDFS7.js": {
-    "file": "assets/MetricCard-AVXPDFS7.js",
+  "_MetricCard-B7gGGrwD.js": {
+    "file": "assets/MetricCard-B7gGGrwD.js",
     "name": "MetricCard",
     "imports": [
       "_api-Dk5sHoDI.js",
       "resources/js/app.jsx"
     ]
   },
-  "_Modal-CED5tPJh.js": {
-    "file": "assets/Modal-CED5tPJh.js",
+  "_Modal-BjgJ9NFL.js": {
+    "file": "assets/Modal-BjgJ9NFL.js",
     "name": "Modal",
     "imports": [
       "_api-Dk5sHoDI.js",
@@ -38,16 +38,16 @@
       "_api-Dk5sHoDI.js"
     ]
   },
-  "_PerformanceChart-DmgKuUTY.js": {
-    "file": "assets/PerformanceChart-DmgKuUTY.js",
+  "_PerformanceChart-CHS0n3Om.js": {
+    "file": "assets/PerformanceChart-CHS0n3Om.js",
     "name": "PerformanceChart",
     "imports": [
       "_api-Dk5sHoDI.js",
       "resources/js/app.jsx"
     ]
   },
-  "_StatusBadge-q9oyQBGL.js": {
-    "file": "assets/StatusBadge-q9oyQBGL.js",
+  "_StatusBadge-CiWCYKot.js": {
+    "file": "assets/StatusBadge-CiWCYKot.js",
     "name": "StatusBadge",
     "imports": [
       "_api-Dk5sHoDI.js",
@@ -138,7 +138,7 @@
     "isEntry": true
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-GIoNYjxa.js",
+    "file": "assets/app-JgK4iMYK.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,
@@ -167,71 +167,71 @@
     ]
   },
   "resources/js/pages/AdminPage.jsx": {
-    "file": "assets/AdminPage-CErr99yp.js",
+    "file": "assets/AdminPage-Brf2zXGH.js",
     "name": "AdminPage",
     "src": "resources/js/pages/AdminPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
       "resources/js/app.jsx",
-      "_MetricCard-AVXPDFS7.js",
+      "_MetricCard-B7gGGrwD.js",
       "_key-round-B09GManY.js",
       "_sparkles-BnE49fgP.js",
       "_PageHeader-DzhBJVdl.js",
-      "_StatusBadge-q9oyQBGL.js"
+      "_StatusBadge-CiWCYKot.js"
     ]
   },
   "resources/js/pages/AnalyticsPage.jsx": {
-    "file": "assets/AnalyticsPage-BtYPTFJe.js",
+    "file": "assets/AnalyticsPage-BzOtbbv4.js",
     "name": "AnalyticsPage",
     "src": "resources/js/pages/AnalyticsPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
-      "_PerformanceChart-DmgKuUTY.js",
-      "_MetricCard-AVXPDFS7.js",
+      "_PerformanceChart-CHS0n3Om.js",
+      "_MetricCard-B7gGGrwD.js",
       "_download-BhPFeUxX.js",
       "_PageHeader-DzhBJVdl.js",
-      "_StatusBadge-q9oyQBGL.js"
+      "_StatusBadge-CiWCYKot.js"
     ]
   },
   "resources/js/pages/CampaignsPage.jsx": {
-    "file": "assets/CampaignsPage-CxYLHshR.js",
+    "file": "assets/CampaignsPage-5MO8Oswh.js",
     "name": "CampaignsPage",
     "src": "resources/js/pages/CampaignsPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
       "resources/js/app.jsx",
-      "_MetricCard-AVXPDFS7.js",
+      "_MetricCard-B7gGGrwD.js",
       "_mail-plus-DykjDPqU.js",
       "_plus-BoQy2sq6.js",
       "_sparkles-BnE49fgP.js",
       "_text-align-start-C0byFnDO.js",
-      "_Modal-CED5tPJh.js",
+      "_Modal-BjgJ9NFL.js",
       "_PageHeader-DzhBJVdl.js",
-      "_StatusBadge-q9oyQBGL.js"
+      "_StatusBadge-CiWCYKot.js"
     ]
   },
   "resources/js/pages/ContactsPage.jsx": {
-    "file": "assets/ContactsPage-CQb1Cd21.js",
+    "file": "assets/ContactsPage-CYeu4yFl.js",
     "name": "ContactsPage",
     "src": "resources/js/pages/ContactsPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
       "resources/js/app.jsx",
-      "_MetricCard-AVXPDFS7.js",
+      "_MetricCard-B7gGGrwD.js",
       "_download-BhPFeUxX.js",
       "_mail-plus-DykjDPqU.js",
       "_plus-BoQy2sq6.js",
-      "_Modal-CED5tPJh.js",
+      "_Modal-BjgJ9NFL.js",
       "_PageHeader-DzhBJVdl.js",
-      "_StatusBadge-q9oyQBGL.js"
+      "_StatusBadge-CiWCYKot.js"
     ]
   },
   "resources/js/pages/ConversationsPage.jsx": {
-    "file": "assets/ConversationsPage-il746BB8.js",
+    "file": "assets/ConversationsPage-RFFstTC1.js",
     "name": "ConversationsPage",
     "src": "resources/js/pages/ConversationsPage.jsx",
     "isDynamicEntry": true,
@@ -239,25 +239,25 @@
       "_api-Dk5sHoDI.js",
       "resources/js/app.jsx",
       "_PageHeader-DzhBJVdl.js",
-      "_StatusBadge-q9oyQBGL.js"
+      "_StatusBadge-CiWCYKot.js"
     ]
   },
   "resources/js/pages/DashboardPage.jsx": {
-    "file": "assets/DashboardPage-oTJPueyU.js",
+    "file": "assets/DashboardPage-DkLtNqFC.js",
     "name": "DashboardPage",
     "src": "resources/js/pages/DashboardPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
       "resources/js/app.jsx",
-      "_PerformanceChart-DmgKuUTY.js",
-      "_MetricCard-AVXPDFS7.js",
+      "_PerformanceChart-CHS0n3Om.js",
+      "_MetricCard-B7gGGrwD.js",
       "_PageHeader-DzhBJVdl.js",
-      "_StatusBadge-q9oyQBGL.js"
+      "_StatusBadge-CiWCYKot.js"
     ]
   },
   "resources/js/pages/EmailAccountsPage.jsx": {
-    "file": "assets/EmailAccountsPage-CTgYxTEx.js",
+    "file": "assets/EmailAccountsPage-CIeYaX5b.js",
     "name": "EmailAccountsPage",
     "src": "resources/js/pages/EmailAccountsPage.jsx",
     "isDynamicEntry": true,
@@ -267,23 +267,23 @@
       "_radar-CzacGhDJ.js",
       "_send-B9l0_BA4.js",
       "_shield-check-Cuv9qHCF.js",
-      "_Modal-CED5tPJh.js",
-      "_StatusBadge-q9oyQBGL.js"
+      "_Modal-BjgJ9NFL.js",
+      "_StatusBadge-CiWCYKot.js"
     ]
   },
   "resources/js/pages/ForgotPasswordPage.jsx": {
-    "file": "assets/ForgotPasswordPage-D_GMvM0E.js",
+    "file": "assets/ForgotPasswordPage-CapKH2PE.js",
     "name": "ForgotPasswordPage",
     "src": "resources/js/pages/ForgotPasswordPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
       "resources/js/app.jsx",
-      "_AuthShell-Dr4cOi9u.js"
+      "_AuthShell-Dswptfxw.js"
     ]
   },
   "resources/js/pages/LoginPage.jsx": {
-    "file": "assets/LoginPage-J44WbMsT.js",
+    "file": "assets/LoginPage-CvVh0T4i.js",
     "name": "LoginPage",
     "src": "resources/js/pages/LoginPage.jsx",
     "isDynamicEntry": true,
@@ -296,24 +296,24 @@
     ]
   },
   "resources/js/pages/QuickMailPage.jsx": {
-    "file": "assets/QuickMailPage-C3jYTnQT.js",
+    "file": "assets/QuickMailPage-BMeDTMeq.js",
     "name": "QuickMailPage",
     "src": "resources/js/pages/QuickMailPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
       "resources/js/app.jsx",
-      "_MetricCard-AVXPDFS7.js",
+      "_MetricCard-B7gGGrwD.js",
       "_mail-plus-DykjDPqU.js",
       "_send-B9l0_BA4.js",
       "_sparkles-BnE49fgP.js",
       "_text-align-start-C0byFnDO.js",
       "_PageHeader-DzhBJVdl.js",
-      "_StatusBadge-q9oyQBGL.js"
+      "_StatusBadge-CiWCYKot.js"
     ]
   },
   "resources/js/pages/RegisterPage.jsx": {
-    "file": "assets/RegisterPage-DIVydK6G.js",
+    "file": "assets/RegisterPage-B6lZ_4ni.js",
     "name": "RegisterPage",
     "src": "resources/js/pages/RegisterPage.jsx",
     "isDynamicEntry": true,
@@ -324,18 +324,18 @@
     ]
   },
   "resources/js/pages/ResetPasswordPage.jsx": {
-    "file": "assets/ResetPasswordPage-MI_UAu6a.js",
+    "file": "assets/ResetPasswordPage-CCXbQO7g.js",
     "name": "ResetPasswordPage",
     "src": "resources/js/pages/ResetPasswordPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
       "resources/js/app.jsx",
-      "_AuthShell-Dr4cOi9u.js"
+      "_AuthShell-Dswptfxw.js"
     ]
   },
   "resources/js/pages/SettingsPage.jsx": {
-    "file": "assets/SettingsPage-CzP76Wav.js",
+    "file": "assets/SettingsPage-C1zTO1hS.js",
     "name": "SettingsPage",
     "src": "resources/js/pages/SettingsPage.jsx",
     "isDynamicEntry": true,
@@ -344,13 +344,13 @@
       "resources/js/app.jsx",
       "_key-round-B09GManY.js",
       "_shield-check-Cuv9qHCF.js",
-      "_Modal-CED5tPJh.js",
+      "_Modal-BjgJ9NFL.js",
       "_PageHeader-DzhBJVdl.js",
-      "_StatusBadge-q9oyQBGL.js"
+      "_StatusBadge-CiWCYKot.js"
     ]
   },
   "resources/js/pages/TwoFactorPage.jsx": {
-    "file": "assets/TwoFactorPage-BqJiKSL6.js",
+    "file": "assets/TwoFactorPage-CQLus7P_.js",
     "name": "TwoFactorPage",
     "src": "resources/js/pages/TwoFactorPage.jsx",
     "isDynamicEntry": true,

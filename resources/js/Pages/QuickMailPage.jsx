@@ -36,6 +36,49 @@ function trackingState(log) {
   return { label: log.event_type, tone: 'slate' };
 }
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function fallbackDraftFromBrief(brief, form) {
+  const lines = String(brief || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const company = form.company || '{{company}}';
+  const opener = lines[0] || `I wanted to reach out with an idea that may be relevant for ${company}.`;
+  const valueLine = lines[1] || 'I think there may be a practical way to improve results without making this complicated.';
+  const ctaLine = lines[2] || 'If this sounds relevant, would you be open to a quick conversation next week?';
+  const subject = form.subject || `Quick question for ${company}`;
+  const html = [
+    '<p>Hi {{first_name}},</p>',
+    `<p>${escapeHtml(opener)}</p>`,
+    `<p>${escapeHtml(valueLine)}</p>`,
+    `<p>${escapeHtml(ctaLine)}</p>`,
+    '<p>Best,<br />{{Name}}</p>',
+  ].join('');
+
+  const text = [
+    'Hi {{first_name}},',
+    '',
+    opener,
+    '',
+    valueLine,
+    '',
+    ctaLine,
+    '',
+    'Best,',
+    '{{Name}}',
+  ].join('\n');
+
+  return { subject, html, text };
+}
+
 export function QuickMailPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -141,7 +184,16 @@ export function QuickMailPage() {
 
       toast.success('AI draft generated');
     } catch (error) {
-      toast.error(error.payload?.message || error.message || 'AI draft failed');
+      const fallback = fallbackDraftFromBrief(aiBrief, form);
+
+      setForm((current) => ({
+        ...current,
+        subject: fallback.subject || current.subject,
+        body_html: fallback.html,
+        body_text: fallback.text,
+      }));
+
+      toast.error(error.payload?.message || error.message || 'AI is unavailable, so a local draft was created instead.');
     } finally {
       setAiBusy(false);
     }
