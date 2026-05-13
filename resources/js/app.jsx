@@ -8,6 +8,7 @@ import '../css/app.css';
 
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then((module) => ({ default: module.DashboardPage })));
 const ContactsPage = lazy(() => import('./pages/ContactsPage').then((module) => ({ default: module.ContactsPage })));
+const QuickMailPage = lazy(() => import('./pages/QuickMailPage').then((module) => ({ default: module.QuickMailPage })));
 const EmailAccountsPage = lazy(() => import('./pages/EmailAccountsPage').then((module) => ({ default: module.EmailAccountsPage })));
 const CampaignsPage = lazy(() => import('./pages/CampaignsPage').then((module) => ({ default: module.CampaignsPage })));
 const ConversationsPage = lazy(() => import('./pages/ConversationsPage').then((module) => ({ default: module.ConversationsPage })));
@@ -94,6 +95,7 @@ function App() {
         <Route element={<ProtectedLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/contacts" element={<ContactsPage />} />
+          <Route path="/quick-mail" element={<QuickMailPage />} />
           <Route path="/accounts" element={<EmailAccountsPage />} />
           <Route path="/campaigns" element={<CampaignsPage />} />
           <Route path="/conversations" element={<ConversationsPage />} />

@@ -3,14 +3,23 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ConversationThread;
 use App\Models\Contact;
 use App\Models\ContactGroup;
+use App\Models\EmailAccount;
+use App\Models\EmailLog;
+use App\Models\SuppressionEntry;
 use App\Models\Tag;
 use App\Services\ActivityLogger;
 use App\Services\ContactImportService;
+use App\Services\DynamicSmtpMailer;
+use App\Services\TrackingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ContactController extends Controller
@@ -18,13 +27,15 @@ class ContactController extends Controller
     public function __construct(
         private readonly ContactImportService $importService,
         private readonly ActivityLogger $activityLogger,
+        private readonly DynamicSmtpMailer $dynamicSmtpMailer,
+        private readonly TrackingService $trackingService,
     ) {
     }
 
     public function index(Request $request): JsonResponse
     {
         $contacts = $request->user()->contacts()
-            ->with(['tags', 'groups'])
+            ->with(['tags', 'groups', 'latestEmailLog'])
             ->when($request->string('search')->toString(), function ($query, string $search): void {
                 $query->where(function ($searchQuery) use ($search): void {
                     $searchQuery
@@ -155,6 +166,169 @@ class ContactController extends Controller
         }, 'contacts-import-sample.csv', ['Content-Type' => 'text/csv']);
     }
 
+    public function quickSend(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'first_name' => ['nullable', 'string', 'max:255'],
+            'last_name' => ['nullable', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255'],
+            'company' => ['nullable', 'string', 'max:255'],
+            'job_title' => ['nullable', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:255'],
+            'website' => ['nullable', 'string', 'max:255'],
+            'location' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string'],
+            'status' => ['nullable', 'string', 'max:40'],
+            'email_account_id' => ['required', 'integer'],
+            'subject' => ['required', 'string', 'max:255'],
+            'body_html' => ['required', 'string', 'min:10'],
+            'body_text' => ['nullable', 'string'],
+        ]);
+
+        $account = $request->user()->emailAccounts()->find($validated['email_account_id']);
+
+        if (! $account instanceof EmailAccount) {
+            throw ValidationException::withMessages([
+                'email_account_id' => 'Choose a valid sender mailbox before sending.',
+            ]);
+        }
+
+        if (SuppressionEntry::query()
+            ->where('user_id', $request->user()->id)
+            ->where('email', strtolower($validated['email']))
+            ->exists()) {
+            throw ValidationException::withMessages([
+                'email' => 'This contact is currently suppressed and cannot receive outreach.',
+            ]);
+        }
+
+        $result = DB::transaction(function () use ($request, $validated, $account): array {
+            $contact = Contact::firstOrNew([
+                'user_id' => $request->user()->id,
+                'email' => strtolower($validated['email']),
+            ]);
+
+            $contact->fill([
+                'first_name' => $validated['first_name'] ?? $contact->first_name,
+                'last_name' => $validated['last_name'] ?? $contact->last_name,
+                'company' => $validated['company'] ?? $contact->company,
+                'job_title' => $validated['job_title'] ?? $contact->job_title,
+                'phone' => $validated['phone'] ?? $contact->phone,
+                'website' => $validated['website'] ?? $contact->website,
+                'location' => $validated['location'] ?? $contact->location,
+                'notes' => $validated['notes'] ?? $contact->notes,
+                'status' => $validated['status'] ?? $contact->status ?? 'active',
+            ]);
+            $contact->save();
+
+            if (in_array($contact->status, ['unsubscribed', 'bounced'], true)) {
+                throw ValidationException::withMessages([
+                    'email' => 'This contact cannot receive cold email because they are unsubscribed or bounced.',
+                ]);
+            }
+
+            $thread = ConversationThread::firstOrCreate(
+                [
+                    'user_id' => $request->user()->id,
+                    'contact_id' => $contact->id,
+                    'campaign_id' => null,
+                ],
+                [
+                    'email_account_id' => $account->id,
+                    'subject' => $validated['subject'],
+                    'status' => 'open',
+                    'last_message_at' => now(),
+                ],
+            );
+
+            $log = EmailLog::create([
+                'user_id' => $request->user()->id,
+                'campaign_id' => null,
+                'campaign_step_id' => null,
+                'campaign_recipient_id' => null,
+                'contact_id' => $contact->id,
+                'email_account_id' => $account->id,
+                'conversation_thread_id' => $thread->id,
+                'direction' => 'outbound',
+                'event_type' => 'queued',
+                'subject' => $validated['subject'],
+                'recipient_email' => $contact->email,
+                'sender_email' => $account->email_address,
+                'tracking_token' => (string) Str::uuid(),
+                'unsubscribe_token' => $contact->unsubscribe_token,
+            ]);
+
+            $htmlBody = trim((string) $validated['body_html']);
+            $text = trim((string) ($validated['body_text'] ?? strip_tags($htmlBody)));
+            $html = $this->trackingService->decorate($log, $htmlBody);
+            $headers = [];
+            $lastMessageId = $thread->emailLogs()
+                ->whereNotNull('provider_message_id')
+                ->latest('id')
+                ->value('provider_message_id');
+
+            if ($lastMessageId) {
+                $headers['In-Reply-To'] = $lastMessageId;
+                $headers['References'] = $lastMessageId;
+            }
+
+            $sendResult = $this->dynamicSmtpMailer->send($account, [
+                'to' => $contact->email,
+                'subject' => $validated['subject'],
+                'html' => $html,
+                'text' => $text,
+                'headers' => $headers,
+            ]);
+
+            $log->update([
+                'event_type' => 'sent',
+                'provider_message_id' => trim($sendResult['message_id'] ?? '', '<>'),
+                'body_preview' => mb_substr($text, 0, 240),
+                'sent_at' => now(),
+            ]);
+
+            $contact->update([
+                'last_contacted_at' => now(),
+            ]);
+
+            $thread->update([
+                'email_account_id' => $account->id,
+                'subject' => $validated['subject'],
+                'last_message_at' => now(),
+                'status' => 'open',
+            ]);
+
+            $this->activityLogger->log(
+                $request->user(),
+                'contacts.quick_email_sent',
+                $contact,
+                $request,
+                [
+                    'email_account_id' => $account->id,
+                    'thread_id' => $thread->id,
+                    'email_log_id' => $log->id,
+                ],
+                "Sent a quick cold email to {$contact->email}."
+            );
+
+            $contact->load(['tags', 'groups', 'latestEmailLog']);
+
+            return [
+                'contact' => $contact,
+                'thread' => $thread,
+                'log' => $log->fresh(),
+            ];
+        });
+
+        return response()->json([
+            'data' => [
+                'contact' => $this->serializeContact($result['contact']),
+                'thread_id' => $result['thread']->id,
+                'email_log' => $this->serializeEmailLog($result['log']),
+            ],
+        ], 201);
+    }
+
     private function validatePayload(Request $request, ?int $ignoreId = null): array
     {
         return $request->validate([
@@ -243,19 +417,30 @@ class ContactController extends Controller
             'unsubscribed_at' => $contact->unsubscribed_at?->toIso8601String(),
             'tags' => $contact->tags->map(fn (Tag $tag) => ['id' => $tag->id, 'name' => $tag->name, 'color' => $tag->color])->all(),
             'groups' => $contact->groups->map(fn (ContactGroup $group) => ['id' => $group->id, 'name' => $group->name, 'color' => $group->color])->all(),
+            'latest_email_log' => $contact->relationLoaded('latestEmailLog') && $contact->latestEmailLog
+                ? $this->serializeEmailLog($contact->latestEmailLog)
+                : null,
         ];
 
         if ($withActivity) {
-            $payload['email_logs'] = $contact->emailLogs->map(fn ($log) => [
-                'id' => $log->id,
-                'direction' => $log->direction,
-                'event_type' => $log->event_type,
-                'subject' => $log->subject,
-                'body_preview' => $log->body_preview,
-                'sent_at' => $log->sent_at?->toIso8601String(),
-            ])->all();
+            $payload['email_logs'] = $contact->emailLogs->map(fn ($log) => $this->serializeEmailLog($log))->all();
         }
 
         return $payload;
     }
+
+    private function serializeEmailLog(EmailLog $log): array
+    {
+        return [
+            'id' => $log->id,
+            'direction' => $log->direction,
+            'event_type' => $log->event_type,
+            'subject' => $log->subject,
+            'body_preview' => $log->body_preview,
+            'sent_at' => $log->sent_at?->toIso8601String(),
+            'opened_at' => $log->opened_at?->toIso8601String(),
+            'clicked_at' => $log->clicked_at?->toIso8601String(),
+        ];
+    }
+
 }

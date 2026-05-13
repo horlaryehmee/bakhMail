@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Download, Plus, Search, Upload, Users } from 'lucide-react';
+import { Download, MailPlus, Plus, Search, Upload, Users } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Modal } from '../components/Modal';
 import { MetricCard } from '../components/MetricCard';
@@ -24,7 +25,17 @@ function createEmptyContact() {
   };
 }
 
+function trackingState(log) {
+  if (!log) return null;
+  if (log.clicked_at) return { label: 'clicked', tone: 'emerald' };
+  if (log.opened_at) return { label: 'opened', tone: 'blue' };
+  if (log.event_type === 'sent') return { label: 'sent', tone: 'amber' };
+  if (log.event_type === 'failed') return { label: 'failed', tone: 'rose' };
+  return { label: log.event_type, tone: 'slate' };
+}
+
 export function ContactsPage() {
+  const navigate = useNavigate();
   const [payload, setPayload] = useState(null);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -34,6 +45,10 @@ export function ContactsPage() {
   const contacts = useMemo(() => payload?.data || [], [payload]);
   const activeContacts = useMemo(() => contacts.filter((contact) => contact.status === 'active').length, [contacts]);
   const taggedContacts = useMemo(() => contacts.filter((contact) => contact.tags?.length).length, [contacts]);
+  const trackedContacts = useMemo(
+    () => contacts.filter((contact) => contact.latest_email_log?.opened_at || contact.latest_email_log?.clicked_at).length,
+    [contacts],
+  );
 
   async function loadContacts(query = '') {
     const response = await api.get(`/api/contacts${query ? `?search=${encodeURIComponent(query)}` : ''}`);
@@ -49,14 +64,8 @@ export function ContactsPage() {
 
     const body = {
       ...form,
-      tags: form.tags
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean),
-      groups: form.groups
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean),
+      tags: form.tags.split(',').map((item) => item.trim()).filter(Boolean),
+      groups: form.groups.split(',').map((item) => item.trim()).filter(Boolean),
     };
 
     try {
@@ -94,6 +103,14 @@ export function ContactsPage() {
     setModalOpen(true);
   }
 
+  function startQuickMail(contact) {
+    navigate('/quick-mail', {
+      state: {
+        contact,
+      },
+    });
+  }
+
   async function destroyContact(id) {
     try {
       await api.post(`/api/contacts/${id}/remove`, {});
@@ -129,7 +146,7 @@ export function ContactsPage() {
         stats={[
           { label: 'All contacts', value: contacts.length },
           { label: 'Active', value: activeContacts },
-          { label: 'Tagged', value: taggedContacts },
+          { label: 'Tracked', value: trackedContacts },
         ]}
         actions={
           <>
@@ -148,6 +165,10 @@ export function ContactsPage() {
               <Download size={16} />
               <span>Export CSV</span>
             </a>
+            <button className="ghost-button" type="button" onClick={() => navigate('/quick-mail')}>
+              <MailPlus size={16} />
+              <span>Quick mail</span>
+            </button>
             <button className="primary-button" type="button" onClick={openNewModal}>
               <Plus size={16} />
               <span>Add contact</span>
@@ -158,18 +179,8 @@ export function ContactsPage() {
 
       <section className="grid gap-4 md:grid-cols-3">
         <MetricCard label="Prospects" value={contacts.length} hint="Visible records" icon={Users} tone="blue" />
-        <MetricCard
-          label="Segments"
-          value={`${payload?.filters?.groups?.length || 0}`}
-          hint="Saved groups"
-          tone="emerald"
-        />
-        <MetricCard
-          label="Tags"
-          value={`${payload?.filters?.tags?.length || 0}`}
-          hint="Reusable labels"
-          tone="amber"
-        />
+        <MetricCard label="Segments" value={`${payload?.filters?.groups?.length || 0}`} hint="Saved groups" tone="emerald" />
+        <MetricCard label="Tagged" value={taggedContacts} hint="Reusable labels" tone="amber" />
       </section>
 
       <section className="surface-card p-5 sm:p-6">
@@ -210,63 +221,88 @@ export function ContactsPage() {
 
       <section className="surface-card table-shell">
         <div className="overflow-x-auto">
-          <table className="data-table min-w-[920px] text-left">
+          <table className="data-table min-w-[1080px] text-left">
             <thead>
               <tr>
                 <th>Prospect</th>
                 <th>Company</th>
                 <th>Status</th>
+                <th>Latest outreach</th>
                 <th>Tags</th>
                 <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {contacts.length ? (
-                contacts.map((contact) => (
-                  <tr key={contact.id}>
-                    <td>
-                      <div className="font-semibold text-slate-950">{contact.full_name}</div>
-                      <div className="mt-1 text-sm text-slate-500">{contact.email}</div>
-                    </td>
-                    <td>
-                      <div className="font-medium text-slate-700">{contact.company || 'No company'}</div>
-                      <div className="mt-1 text-sm text-slate-500">{contact.job_title || 'No title'}</div>
-                    </td>
-                    <td>
-                      <StatusBadge status={contact.status} />
-                    </td>
-                    <td>
-                      <div className="flex flex-wrap gap-2">
-                        {contact.tags?.length ? (
-                          contact.tags.map((tag) => (
-                            <span
-                              key={tag.id}
-                              className="rounded-full px-3 py-1 text-xs font-semibold text-slate-700"
-                              style={{ backgroundColor: `${tag.color}22` }}
-                            >
-                              {tag.name}
-                            </span>
-                          ))
+                contacts.map((contact) => {
+                  const state = trackingState(contact.latest_email_log);
+
+                  return (
+                    <tr key={contact.id}>
+                      <td>
+                        <div className="font-semibold text-slate-950">{contact.full_name}</div>
+                        <div className="mt-1 text-sm text-slate-500">{contact.email}</div>
+                      </td>
+                      <td>
+                        <div className="font-medium text-slate-700">{contact.company || 'No company'}</div>
+                        <div className="mt-1 text-sm text-slate-500">{contact.job_title || 'No title'}</div>
+                      </td>
+                      <td>
+                        <StatusBadge status={contact.status} />
+                      </td>
+                      <td>
+                        {contact.latest_email_log ? (
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {state ? <StatusBadge status={state.label} tone={state.tone} /> : null}
+                              <span className="text-sm text-slate-500">
+                                {contact.latest_email_log.sent_at ? new Date(contact.latest_email_log.sent_at).toLocaleString() : 'Pending'}
+                              </span>
+                            </div>
+                            <div className="max-w-[260px] truncate text-sm text-slate-500">
+                              {contact.latest_email_log.subject || 'No subject'}
+                            </div>
+                          </div>
                         ) : (
-                          <span className="text-sm text-slate-400">No tags</span>
+                          <span className="text-sm text-slate-400">No outbound email yet</span>
                         )}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="flex justify-end gap-2">
-                        <button className="ghost-button" type="button" onClick={() => startEdit(contact)}>
-                          Edit
-                        </button>
-                        <button className="ghost-button" type="button" onClick={() => destroyContact(contact.id)}>
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td>
+                        <div className="flex flex-wrap gap-2">
+                          {contact.tags?.length ? (
+                            contact.tags.map((tag) => (
+                              <span
+                                key={tag.id}
+                                className="rounded-full px-3 py-1 text-xs font-semibold text-slate-700"
+                                style={{ backgroundColor: `${tag.color}22` }}
+                              >
+                                {tag.name}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-sm text-slate-400">No tags</span>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="flex justify-end gap-2">
+                          <button className="ghost-button" type="button" onClick={() => startQuickMail(contact)}>
+                            Email
+                          </button>
+                          <button className="ghost-button" type="button" onClick={() => startEdit(contact)}>
+                            Edit
+                          </button>
+                          <button className="ghost-button" type="button" onClick={() => destroyContact(contact.id)}>
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
-                  <td colSpan="5">
+                  <td colSpan="6">
                     <div className="empty-panel m-4 p-6 text-center text-sm">
                       No contacts matched the current search.
                     </div>

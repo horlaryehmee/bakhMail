@@ -25,6 +25,7 @@ import { useAppStore } from '../../store/useAppStore';
 const baseLinks = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/contacts', label: 'Contacts', icon: Users },
+  { to: '/quick-mail', label: 'Quick Mail', icon: Mail },
   { to: '/accounts', label: 'Accounts', icon: ServerCog },
   { to: '/campaigns', label: 'Campaigns', icon: Mail },
   { to: '/conversations', label: 'Replies', icon: Inbox },
@@ -32,7 +33,7 @@ const baseLinks = [
   { to: '/settings', label: 'Settings', icon: Settings2 },
 ];
 
-const mobileRailOrder = ['/dashboard', '/contacts', '/campaigns', '/conversations', '/analytics'];
+const mobileRailOrder = ['/dashboard', '/contacts', '/quick-mail', '/campaigns', '/analytics'];
 
 function DesktopSidebar({ appName, user, notifications, today, links, onClose, onLogout }) {
   return (

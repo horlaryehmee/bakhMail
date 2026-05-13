@@ -44,6 +44,7 @@ Route::prefix('api')->group(function (): void {
         Route::get('/contacts/export', [ContactController::class, 'export'])->name('api.contacts.export');
         Route::get('/contacts/import-template', [ContactController::class, 'importTemplate'])->name('api.contacts.import-template');
         Route::post('/contacts/import', [ContactController::class, 'import'])->name('api.contacts.import');
+        Route::post('/contacts/quick-send', [ContactController::class, 'quickSend'])->name('api.contacts.quick-send');
         Route::post('/contacts/{contact}/remove', [ContactController::class, 'remove'])->name('api.contacts.remove');
         Route::apiResource('contacts', ContactController::class);
 
