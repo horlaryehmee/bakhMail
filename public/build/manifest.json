@@ -145,39 +145,10 @@
     "src": "resources/css/app.css",
     "isEntry": true
   },
-  "resources/js/app.jsx": {
-    "file": "assets/app-BBApViaa.js",
-    "name": "app",
-    "src": "resources/js/app.jsx",
-    "isEntry": true,
-    "imports": [
-      "_api-Dk5sHoDI.js",
-      "_AnimatePresence-D9kqs25W.js"
-    ],
-    "dynamicImports": [
-      "resources/js/pages/DashboardPage.jsx",
-      "resources/js/pages/ContactsPage.jsx",
-      "resources/js/pages/QuickMailPage.jsx",
-      "resources/js/pages/EmailAccountsPage.jsx",
-      "resources/js/pages/CampaignsPage.jsx",
-      "resources/js/pages/ConversationsPage.jsx",
-      "resources/js/pages/AnalyticsPage.jsx",
-      "resources/js/pages/SettingsPage.jsx",
-      "resources/js/pages/AdminPage.jsx",
-      "resources/js/pages/LoginPage.jsx",
-      "resources/js/pages/RegisterPage.jsx",
-      "resources/js/pages/ForgotPasswordPage.jsx",
-      "resources/js/pages/ResetPasswordPage.jsx",
-      "resources/js/pages/TwoFactorPage.jsx"
-    ],
-    "css": [
-      "assets/app-CVqMCkb5.css"
-    ]
-  },
-  "resources/js/pages/AdminPage.jsx": {
+  "resources/js/Pages/AdminPage.jsx": {
     "file": "assets/AdminPage-ClZTE7Mg.js",
     "name": "AdminPage",
-    "src": "resources/js/pages/AdminPage.jsx",
+    "src": "resources/js/Pages/AdminPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
@@ -189,10 +160,10 @@
       "_StatusBadge-C4VJirle.js"
     ]
   },
-  "resources/js/pages/AnalyticsPage.jsx": {
+  "resources/js/Pages/AnalyticsPage.jsx": {
     "file": "assets/AnalyticsPage-CWAKL8Or.js",
     "name": "AnalyticsPage",
-    "src": "resources/js/pages/AnalyticsPage.jsx",
+    "src": "resources/js/Pages/AnalyticsPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
@@ -203,10 +174,10 @@
       "_StatusBadge-C4VJirle.js"
     ]
   },
-  "resources/js/pages/CampaignsPage.jsx": {
+  "resources/js/Pages/CampaignsPage.jsx": {
     "file": "assets/CampaignsPage-CD9pvkT-.js",
     "name": "CampaignsPage",
-    "src": "resources/js/pages/CampaignsPage.jsx",
+    "src": "resources/js/Pages/CampaignsPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
@@ -221,10 +192,10 @@
       "_StatusBadge-C4VJirle.js"
     ]
   },
-  "resources/js/pages/ContactsPage.jsx": {
+  "resources/js/Pages/ContactsPage.jsx": {
     "file": "assets/ContactsPage-CskOkLhS.js",
     "name": "ContactsPage",
-    "src": "resources/js/pages/ContactsPage.jsx",
+    "src": "resources/js/Pages/ContactsPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
@@ -238,10 +209,10 @@
       "_StatusBadge-C4VJirle.js"
     ]
   },
-  "resources/js/pages/ConversationsPage.jsx": {
+  "resources/js/Pages/ConversationsPage.jsx": {
     "file": "assets/ConversationsPage-c3dEVLMe.js",
     "name": "ConversationsPage",
-    "src": "resources/js/pages/ConversationsPage.jsx",
+    "src": "resources/js/Pages/ConversationsPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
@@ -252,10 +223,10 @@
       "_StatusBadge-C4VJirle.js"
     ]
   },
-  "resources/js/pages/DashboardPage.jsx": {
+  "resources/js/Pages/DashboardPage.jsx": {
     "file": "assets/DashboardPage-e2NqvoSJ.js",
     "name": "DashboardPage",
-    "src": "resources/js/pages/DashboardPage.jsx",
+    "src": "resources/js/Pages/DashboardPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
@@ -266,10 +237,10 @@
       "_StatusBadge-C4VJirle.js"
     ]
   },
-  "resources/js/pages/EmailAccountsPage.jsx": {
+  "resources/js/Pages/EmailAccountsPage.jsx": {
     "file": "assets/EmailAccountsPage-DqyGpzm4.js",
     "name": "EmailAccountsPage",
-    "src": "resources/js/pages/EmailAccountsPage.jsx",
+    "src": "resources/js/Pages/EmailAccountsPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
@@ -282,10 +253,10 @@
       "_StatusBadge-C4VJirle.js"
     ]
   },
-  "resources/js/pages/ForgotPasswordPage.jsx": {
+  "resources/js/Pages/ForgotPasswordPage.jsx": {
     "file": "assets/ForgotPasswordPage-BTHJPx2_.js",
     "name": "ForgotPasswordPage",
-    "src": "resources/js/pages/ForgotPasswordPage.jsx",
+    "src": "resources/js/Pages/ForgotPasswordPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
@@ -293,10 +264,10 @@
       "_AuthShell-DjqSCD0Q.js"
     ]
   },
-  "resources/js/pages/LoginPage.jsx": {
+  "resources/js/Pages/LoginPage.jsx": {
     "file": "assets/LoginPage-BRpL8R3P.js",
     "name": "LoginPage",
-    "src": "resources/js/pages/LoginPage.jsx",
+    "src": "resources/js/Pages/LoginPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
@@ -306,10 +277,10 @@
       "_radar-Cd3Yj_c2.js"
     ]
   },
-  "resources/js/pages/QuickMailPage.jsx": {
+  "resources/js/Pages/QuickMailPage.jsx": {
     "file": "assets/QuickMailPage-Bk5YXGN0.js",
     "name": "QuickMailPage",
-    "src": "resources/js/pages/QuickMailPage.jsx",
+    "src": "resources/js/Pages/QuickMailPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
@@ -323,10 +294,10 @@
       "_StatusBadge-C4VJirle.js"
     ]
   },
-  "resources/js/pages/RegisterPage.jsx": {
+  "resources/js/Pages/RegisterPage.jsx": {
     "file": "assets/RegisterPage-CPpUV7Ie.js",
     "name": "RegisterPage",
-    "src": "resources/js/pages/RegisterPage.jsx",
+    "src": "resources/js/Pages/RegisterPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
@@ -334,10 +305,10 @@
       "_arrow-right-GPVJeCP_.js"
     ]
   },
-  "resources/js/pages/ResetPasswordPage.jsx": {
+  "resources/js/Pages/ResetPasswordPage.jsx": {
     "file": "assets/ResetPasswordPage-BqRbr0M8.js",
     "name": "ResetPasswordPage",
-    "src": "resources/js/pages/ResetPasswordPage.jsx",
+    "src": "resources/js/Pages/ResetPasswordPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
@@ -345,10 +316,10 @@
       "_AuthShell-DjqSCD0Q.js"
     ]
   },
-  "resources/js/pages/SettingsPage.jsx": {
+  "resources/js/Pages/SettingsPage.jsx": {
     "file": "assets/SettingsPage-B4MCQQP7.js",
     "name": "SettingsPage",
-    "src": "resources/js/pages/SettingsPage.jsx",
+    "src": "resources/js/Pages/SettingsPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
@@ -360,10 +331,10 @@
       "_StatusBadge-C4VJirle.js"
     ]
   },
-  "resources/js/pages/TwoFactorPage.jsx": {
+  "resources/js/Pages/TwoFactorPage.jsx": {
     "file": "assets/TwoFactorPage-BrCMBtFG.js",
     "name": "TwoFactorPage",
-    "src": "resources/js/pages/TwoFactorPage.jsx",
+    "src": "resources/js/Pages/TwoFactorPage.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_api-Dk5sHoDI.js",
@@ -371,6 +342,35 @@
       "_arrow-right-GPVJeCP_.js",
       "_key-round-3cyl5wng.js",
       "_shield-check-ZkcT4QdF.js"
+    ]
+  },
+  "resources/js/app.jsx": {
+    "file": "assets/app-BBApViaa.js",
+    "name": "app",
+    "src": "resources/js/app.jsx",
+    "isEntry": true,
+    "imports": [
+      "_api-Dk5sHoDI.js",
+      "_AnimatePresence-D9kqs25W.js"
+    ],
+    "dynamicImports": [
+      "resources/js/Pages/DashboardPage.jsx",
+      "resources/js/Pages/ContactsPage.jsx",
+      "resources/js/Pages/QuickMailPage.jsx",
+      "resources/js/Pages/EmailAccountsPage.jsx",
+      "resources/js/Pages/CampaignsPage.jsx",
+      "resources/js/Pages/ConversationsPage.jsx",
+      "resources/js/Pages/AnalyticsPage.jsx",
+      "resources/js/Pages/SettingsPage.jsx",
+      "resources/js/Pages/AdminPage.jsx",
+      "resources/js/Pages/LoginPage.jsx",
+      "resources/js/Pages/RegisterPage.jsx",
+      "resources/js/Pages/ForgotPasswordPage.jsx",
+      "resources/js/Pages/ResetPasswordPage.jsx",
+      "resources/js/Pages/TwoFactorPage.jsx"
+    ],
+    "css": [
+      "assets/app-CVqMCkb5.css"
     ]
   }
 }

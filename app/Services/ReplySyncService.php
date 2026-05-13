@@ -40,6 +40,15 @@ class ReplySyncService
             return 0;
         }
 
+        if (! function_exists('imap_open')) {
+            Log::warning('Reply sync skipped because the PHP IMAP extension is unavailable.', [
+                'email_account_id' => $account->id,
+                'email_address' => $account->email_address,
+            ]);
+
+            return 0;
+        }
+
         if (! $this->isResolvableHost((string) $account->imap_host)) {
             Log::warning('Reply sync skipped because IMAP host could not be resolved.', [
                 'email_account_id' => $account->id,

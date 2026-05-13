@@ -40,7 +40,7 @@ class EmailAccountController extends Controller
         $accounts = $accountsQuery->get();
 
         return response()->json([
-            'data' => $accounts->map(fn (EmailAccount $account) => $this->serializeAccount($account))->all(),
+            'data' => $accounts->map(fn (EmailAccount $account) => $this->serializeAccount($account, false))->all(),
         ]);
     }
 
@@ -53,7 +53,7 @@ class EmailAccountController extends Controller
 
         $this->activityLogger->log($request->user(), 'accounts.created', $account, $request, description: "Added email account {$account->email_address}.");
 
-        return response()->json(['data' => $this->serializeAccount($account)], 201);
+        return response()->json(['data' => $this->serializeAccount($account, true)], 201);
     }
 
     public function connect(Request $request): JsonResponse
@@ -71,7 +71,7 @@ class EmailAccountController extends Controller
             $emailAccount->loadCount(['emailLogs as sent_count' => fn ($query) => $query->where('event_type', 'sent')]);
         }
 
-        return response()->json(['data' => $this->serializeAccount($emailAccount)]);
+        return response()->json(['data' => $this->serializeAccount($emailAccount, true)]);
     }
 
     public function update(Request $request, int $emailAccount): JsonResponse
@@ -91,7 +91,7 @@ class EmailAccountController extends Controller
 
         $this->activityLogger->log($request->user(), 'accounts.updated', $emailAccount, $request, description: "Updated email account {$emailAccount->email_address}.");
 
-        return response()->json(['data' => $this->serializeAccount($emailAccount)]);
+        return response()->json(['data' => $this->serializeAccount($emailAccount, true)]);
     }
 
     public function save(Request $request, int $emailAccount): JsonResponse
@@ -240,9 +240,9 @@ class EmailAccountController extends Controller
         return $validated;
     }
 
-    private function serializeAccount(EmailAccount $account): array
+    private function serializeAccount(EmailAccount $account, bool $deepImapCheck = false): array
     {
-        $imap = $this->imapDiagnostics($account);
+        $imap = $this->imapDiagnostics($account, $deepImapCheck);
 
         return [
             'id' => $account->id,
@@ -290,7 +290,7 @@ class EmailAccountController extends Controller
         }
     }
 
-    private function imapDiagnostics(EmailAccount $account): array
+    private function imapDiagnostics(EmailAccount $account, bool $deepCheck = true): array
     {
         $host = trim((string) $account->imap_host);
         $resolves = $this->hostResolves($host);
@@ -316,6 +316,22 @@ class EmailAccountController extends Controller
                 'ready' => false,
                 'host_resolves' => true,
                 'message' => 'IMAP password is missing. Save the mailbox again with the password to enable reply sync.',
+            ];
+        }
+
+        if (! function_exists('imap_open')) {
+            return [
+                'ready' => false,
+                'host_resolves' => $resolves,
+                'message' => 'The PHP IMAP extension is not installed on this server. Replies cannot sync until IMAP support is enabled.',
+            ];
+        }
+
+        if (! $deepCheck) {
+            return [
+                'ready' => true,
+                'host_resolves' => true,
+                'message' => 'IMAP configuration looks complete. Run the IMAP test to verify the mailbox connection.',
             ];
         }
 

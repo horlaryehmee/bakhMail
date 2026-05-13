@@ -6,20 +6,20 @@ import { AppShell } from './components/layout/AppShell';
 import { useAppStore } from './store/useAppStore';
 import '../css/app.css';
 
-const DashboardPage = lazy(() => import('./pages/DashboardPage').then((module) => ({ default: module.DashboardPage })));
-const ContactsPage = lazy(() => import('./pages/ContactsPage').then((module) => ({ default: module.ContactsPage })));
-const QuickMailPage = lazy(() => import('./pages/QuickMailPage').then((module) => ({ default: module.QuickMailPage })));
-const EmailAccountsPage = lazy(() => import('./pages/EmailAccountsPage').then((module) => ({ default: module.EmailAccountsPage })));
-const CampaignsPage = lazy(() => import('./pages/CampaignsPage').then((module) => ({ default: module.CampaignsPage })));
-const ConversationsPage = lazy(() => import('./pages/ConversationsPage').then((module) => ({ default: module.ConversationsPage })));
-const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then((module) => ({ default: module.AnalyticsPage })));
-const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })));
-const AdminPage = lazy(() => import('./pages/AdminPage').then((module) => ({ default: module.AdminPage })));
-const LoginPage = lazy(() => import('./pages/LoginPage').then((module) => ({ default: module.LoginPage })));
-const RegisterPage = lazy(() => import('./pages/RegisterPage').then((module) => ({ default: module.RegisterPage })));
-const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage').then((module) => ({ default: module.ForgotPasswordPage })));
-const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage').then((module) => ({ default: module.ResetPasswordPage })));
-const TwoFactorPage = lazy(() => import('./pages/TwoFactorPage').then((module) => ({ default: module.TwoFactorPage })));
+const DashboardPage = lazy(() => import('./Pages/DashboardPage').then((module) => ({ default: module.DashboardPage })));
+const ContactsPage = lazy(() => import('./Pages/ContactsPage').then((module) => ({ default: module.ContactsPage })));
+const QuickMailPage = lazy(() => import('./Pages/QuickMailPage').then((module) => ({ default: module.QuickMailPage })));
+const EmailAccountsPage = lazy(() => import('./Pages/EmailAccountsPage').then((module) => ({ default: module.EmailAccountsPage })));
+const CampaignsPage = lazy(() => import('./Pages/CampaignsPage').then((module) => ({ default: module.CampaignsPage })));
+const ConversationsPage = lazy(() => import('./Pages/ConversationsPage').then((module) => ({ default: module.ConversationsPage })));
+const AnalyticsPage = lazy(() => import('./Pages/AnalyticsPage').then((module) => ({ default: module.AnalyticsPage })));
+const SettingsPage = lazy(() => import('./Pages/SettingsPage').then((module) => ({ default: module.SettingsPage })));
+const AdminPage = lazy(() => import('./Pages/AdminPage').then((module) => ({ default: module.AdminPage })));
+const LoginPage = lazy(() => import('./Pages/LoginPage').then((module) => ({ default: module.LoginPage })));
+const RegisterPage = lazy(() => import('./Pages/RegisterPage').then((module) => ({ default: module.RegisterPage })));
+const ForgotPasswordPage = lazy(() => import('./Pages/ForgotPasswordPage').then((module) => ({ default: module.ForgotPasswordPage })));
+const ResetPasswordPage = lazy(() => import('./Pages/ResetPasswordPage').then((module) => ({ default: module.ResetPasswordPage })));
+const TwoFactorPage = lazy(() => import('./Pages/TwoFactorPage').then((module) => ({ default: module.TwoFactorPage })));
 
 function ProtectedLayout() {
   const user = useAppStore((state) => state.user);
