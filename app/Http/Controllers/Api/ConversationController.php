@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 class ConversationController extends Controller
 {
@@ -139,13 +140,24 @@ class ConversationController extends Controller
             'include_footer' => false,
         ]);
 
-        $result = $this->dynamicSmtpMailer->send($thread->emailAccount, [
-            'to' => $thread->contact->email,
-            'subject' => $subject,
-            'html' => $html,
-            'text' => $textBody,
-            'headers' => $headers,
-        ]);
+        try {
+            $result = $this->dynamicSmtpMailer->send($thread->emailAccount, [
+                'to' => $thread->contact->email,
+                'subject' => $subject,
+                'html' => $html,
+                'text' => $textBody,
+                'headers' => $headers,
+            ]);
+        } catch (RuntimeException $exception) {
+            $log->update([
+                'event_type' => 'failed',
+                'body_preview' => mb_substr($textBody, 0, 240),
+            ]);
+
+            throw ValidationException::withMessages([
+                'reply' => $exception->getMessage(),
+            ]);
+        }
 
         $log->update([
             'event_type' => 'sent',
