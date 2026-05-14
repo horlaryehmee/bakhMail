@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Contact;
 use App\Models\ConversationThread;
+use App\Models\EmailAccount;
 use App\Models\EmailLog;
 use App\Services\ActivityLogger;
 use App\Services\DynamicSmtpMailer;
@@ -12,6 +14,8 @@ use App\Services\TrackingService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -284,7 +288,13 @@ class ConversationController extends Controller
         $reference = trim($reference);
 
         if ($reference === '' || ! ctype_digit($reference)) {
-            abort(404, 'This mailbox item is no longer available. Refresh the mailbox and choose the conversation again.');
+            $thread = $this->resolveThreadFromNotificationReference($request, $reference);
+
+            if ($thread) {
+                return $thread;
+            }
+
+            $this->abortMailboxItemNotFound($request, $reference);
         }
 
         $userId = $request->user()->id;
@@ -315,7 +325,7 @@ class ConversationController extends Controller
             }
         }
 
-        abort(404, 'This mailbox item is no longer available. Refresh the mailbox and choose the conversation again.');
+        $this->abortMailboxItemNotFound($request, $reference);
     }
 
     private function resolveThreadFromEmailLogReference(int $userId, int $id): ?ConversationThread
@@ -323,18 +333,179 @@ class ConversationController extends Controller
         // Older reply screens used email-log ids in some links. Resolve those
         // to their owning thread so stale browser assets do not break mailbox use.
         $log = EmailLog::query()
-            ->where('user_id', $userId)
             ->whereKey($id)
-            ->whereNotNull('conversation_thread_id')
+            ->where(function (Builder $query) use ($userId): void {
+                $query
+                    ->where('user_id', $userId)
+                    ->orWhereHas('thread', fn (Builder $threadQuery) => $threadQuery->where('user_id', $userId))
+                    ->orWhereHas('emailAccount', fn (Builder $accountQuery) => $accountQuery->where('user_id', $userId))
+                    ->orWhereHas('contact', fn (Builder $contactQuery) => $contactQuery->where('user_id', $userId));
+            })
             ->first();
 
-        if ($log) {
-            return ConversationThread::query()
-                ->where('user_id', $userId)
-                ->find($log->conversation_thread_id);
+        if (! $log) {
+            return null;
         }
 
-        return null;
+        if ($log->conversation_thread_id) {
+            $thread = ConversationThread::query()
+                ->where('user_id', $userId)
+                ->find($log->conversation_thread_id);
+
+            if ($thread) {
+                return $thread;
+            }
+        }
+
+        return $this->restoreThreadFromEmailLog($log, $userId);
+    }
+
+    private function restoreThreadFromEmailLog(EmailLog $log, int $userId): ?ConversationThread
+    {
+        $contact = $log->contact && (int) $log->contact->user_id === $userId
+            ? $log->contact
+            : null;
+
+        if (! $contact) {
+            $contactEmail = $log->direction === 'inbound'
+                ? $log->sender_email
+                : $log->recipient_email;
+            $contactEmail = strtolower(trim((string) $contactEmail));
+
+            if (! filter_var($contactEmail, FILTER_VALIDATE_EMAIL)) {
+                return null;
+            }
+
+            $contact = Contact::query()->firstOrCreate(
+                [
+                    'user_id' => $userId,
+                    'email' => $contactEmail,
+                ],
+                [
+                    'first_name' => null,
+                    'last_name' => null,
+                    'unsubscribe_token' => (string) Str::uuid(),
+                    'status' => 'active',
+                ],
+            );
+        }
+
+        $emailAccount = $log->emailAccount && (int) $log->emailAccount->user_id === $userId
+            ? $log->emailAccount
+            : null;
+
+        if (! $emailAccount) {
+            $accountEmail = $log->direction === 'inbound'
+                ? $log->recipient_email
+                : $log->sender_email;
+            $accountEmail = strtolower(trim((string) $accountEmail));
+
+            if ($accountEmail !== '') {
+                $emailAccount = EmailAccount::query()
+                    ->where('user_id', $userId)
+                    ->where('email_address', $accountEmail)
+                    ->first();
+            }
+        }
+
+        $normalizedSubject = $this->normalizeSubject($log->subject);
+        $thread = ConversationThread::query()
+            ->where('user_id', $userId)
+            ->where('contact_id', $contact->id)
+            ->when($emailAccount, fn (Builder $query) => $query->where('email_account_id', $emailAccount->id))
+            ->get()
+            ->first(function (ConversationThread $thread) use ($normalizedSubject): bool {
+                return $this->normalizeSubject($thread->subject) === $normalizedSubject;
+            });
+
+        if (! $thread) {
+            $thread = ConversationThread::create([
+                'user_id' => $userId,
+                'contact_id' => $contact->id,
+                'campaign_id' => $log->campaign_id,
+                'email_account_id' => $emailAccount?->id,
+                'subject' => $log->subject ?: 'Conversation',
+                'status' => $log->event_type === 'bounced' ? 'attention' : 'open',
+                'last_message_at' => $log->sent_at ?? $log->created_at ?? now(),
+            ]);
+        }
+
+        $updates = [
+            'user_id' => $userId,
+            'contact_id' => $contact->id,
+            'conversation_thread_id' => $thread->id,
+        ];
+
+        if ($emailAccount) {
+            $updates['email_account_id'] = $emailAccount->id;
+        }
+
+        $log->update($updates);
+
+        return $thread;
+    }
+
+    private function resolveThreadFromNotificationReference(Request $request, string $reference): ?ConversationThread
+    {
+        if ($reference === '' || ! Schema::hasTable('notifications')) {
+            return null;
+        }
+
+        $notification = $request->user()
+            ->notifications()
+            ->whereKey($reference)
+            ->first();
+
+        if (! $notification) {
+            return null;
+        }
+
+        $threadId = data_get($notification->data, 'meta.thread_id');
+
+        if (is_numeric($threadId)) {
+            $thread = ConversationThread::query()
+                ->where('user_id', $request->user()->id)
+                ->find((int) $threadId);
+
+            if ($thread) {
+                return $thread;
+            }
+        }
+
+        $logId = data_get($notification->data, 'meta.email_log_id');
+
+        return is_numeric($logId)
+            ? $this->resolveThreadFromEmailLogReference($request->user()->id, (int) $logId)
+            : null;
+    }
+
+    private function abortMailboxItemNotFound(Request $request, string $reference): void
+    {
+        Log::warning('Mailbox conversation reference could not be resolved.', [
+            'user_id' => $request->user()?->id,
+            'reference' => $reference,
+            'ref' => $request->query('ref'),
+            'method' => $request->method(),
+            'path' => $request->path(),
+        ]);
+
+        abort(404, 'This mailbox item is no longer available. Refresh the mailbox and choose the conversation again.');
+    }
+
+    private function normalizeSubject(?string $subject): string
+    {
+        $subject = strtolower(trim((string) $subject));
+
+        if ($subject === '') {
+            return '';
+        }
+
+        do {
+            $previous = $subject;
+            $subject = preg_replace('/^(re|fwd|fw)\s*:\s*/i', '', $subject) ?? $subject;
+        } while ($subject !== $previous);
+
+        return $subject;
     }
 
     private function applyFolderFilter(Builder $query, string $folder): void
