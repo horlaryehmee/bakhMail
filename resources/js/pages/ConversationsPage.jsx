@@ -26,37 +26,46 @@ export function ConversationsPage() {
 
   async function loadThreads(preferredThreadId = null) {
     setLoadingThreads(true);
-    const response = await api.get('/api/conversations');
-    const items = response.data || [];
-    startTransition(() => {
-      setThreads(items);
-    });
-
-    const nextThread = preferredThreadId
-      ? items.find((thread) => thread.id === preferredThreadId) || items[0] || null
-      : items[0] || null;
-
-    if (nextThread) {
-      const activeSummary = {
-        ...nextThread,
-        messages: nextThread.latest_inbound_message
-          ? [nextThread.latest_inbound_message]
-          : nextThread.latest_message
-            ? [nextThread.latest_message]
-            : [],
-      };
+    try {
+      const response = await api.get('/api/conversations');
+      const items = response.data || [];
       startTransition(() => {
-        setActiveThread((current) => current?.id === nextThread.id ? current : activeSummary);
+        setThreads(items);
       });
-      loadThread(nextThread.id).catch(() => toast.error('Could not load the selected reply thread'));
-    } else {
-      setActiveThread(null);
-    }
 
-    setLoadingThreads(false);
+      const nextThread = preferredThreadId
+        ? items.find((thread) => String(thread.id) === String(preferredThreadId)) || items[0] || null
+        : items[0] || null;
+
+      if (nextThread) {
+        const activeSummary = {
+          ...nextThread,
+          messages: nextThread.latest_inbound_message
+            ? [nextThread.latest_inbound_message]
+            : nextThread.latest_message
+              ? [nextThread.latest_message]
+              : [],
+        };
+        startTransition(() => {
+          setActiveThread((current) => current?.id === nextThread.id ? current : activeSummary);
+        });
+        await loadThread(nextThread.id, { silent404: true });
+      } else {
+        startTransition(() => {
+          setActiveThread(null);
+        });
+      }
+    } finally {
+      setLoadingThreads(false);
+    }
   }
 
-  async function loadThread(threadId) {
+  async function loadThread(threadId, options = {}) {
+    if (!threadId) {
+      return;
+    }
+
+    const { silent404 = false } = options;
     setLoadingThreadId(threadId);
     try {
       const response = await api.get(`/api/conversations/${threadId}`);
@@ -65,13 +74,28 @@ export function ConversationsPage() {
         setActiveThread(thread);
         setReplyForm(createReplyForm(thread?.subject || ''));
       });
+    } catch (error) {
+      if (silent404 && error.status === 404) {
+        startTransition(() => {
+          setActiveThread(null);
+        });
+        return;
+      }
+
+      throw error;
     } finally {
       setLoadingThreadId(null);
     }
   }
 
   useEffect(() => {
-    loadThreads(location.state?.threadId || null).catch(() => toast.error('Could not load reply threads'));
+    loadThreads(location.state?.threadId || null).catch((error) => {
+      if (error.status === 404) {
+        return;
+      }
+
+      toast.error('Could not load reply threads');
+    });
   }, []);
 
   async function handleReply(event) {
@@ -130,7 +154,7 @@ export function ConversationsPage() {
                 <button
                   key={thread.id}
                   type="button"
-                  onClick={() => loadThread(thread.id)}
+                  onClick={() => loadThread(thread.id).catch(() => toast.error('Could not load the selected reply thread'))}
                   className={`w-full px-5 py-4 text-left transition sm:px-6 ${
                     activeThread?.id === thread.id ? 'bg-blue-50/80' : 'hover:bg-slate-50'
                   }`}
