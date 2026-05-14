@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\EmailAccount;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\Mailer\Transport;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
@@ -57,14 +58,10 @@ class DynamicSmtpMailer
             return 'native://default';
         }
 
-        $host = $this->normalizeHost($account->smtp_host);
+        $host = $this->resolveSmtpHost($account);
 
         if (! $host || ! $account->smtp_port) {
             return null;
-        }
-
-        if (! $this->isResolvableHost($host)) {
-            throw new RuntimeException('SMTP host does not resolve. Update the mailbox SMTP host and try again.');
         }
 
         $authSegment = '';
@@ -116,6 +113,76 @@ class DynamicSmtpMailer
         }
 
         return gethostbyname($host) !== $host;
+    }
+
+    private function resolveSmtpHost(EmailAccount $account): ?string
+    {
+        $configuredHost = $this->normalizeHost($account->smtp_host);
+
+        if ($configuredHost && $this->isResolvableHost($configuredHost)) {
+            return $configuredHost;
+        }
+
+        $fallbackHost = $this->fallbackMailHostFromDomain($account->email_address);
+
+        if ($fallbackHost) {
+            if ($configuredHost && $configuredHost !== $fallbackHost) {
+                Log::warning('SMTP host did not resolve, so the domain MX host was used as a fallback.', [
+                    'email_account_id' => $account->id,
+                    'configured_host' => $configuredHost,
+                    'fallback_host' => $fallbackHost,
+                    'email_address' => $account->email_address,
+                ]);
+            }
+
+            return $fallbackHost;
+        }
+
+        throw new RuntimeException('SMTP host does not resolve. Update the mailbox SMTP host and try again.');
+    }
+
+    private function fallbackMailHostFromDomain(string $emailAddress): ?string
+    {
+        $domain = strtolower(trim((string) substr(strrchr($emailAddress, '@') ?: '', 1)));
+
+        if ($domain === '') {
+            return null;
+        }
+
+        $records = dns_get_record($domain, DNS_MX);
+
+        if (! is_array($records) || $records === []) {
+            return null;
+        }
+
+        usort($records, fn (array $a, array $b) => ($a['pri'] ?? PHP_INT_MAX) <=> ($b['pri'] ?? PHP_INT_MAX));
+
+        foreach ($records as $record) {
+            $target = $this->normalizeHost($record['target'] ?? null);
+
+            if ($target && $this->isResolvableHost($target)) {
+                return $this->resolvePreferredMailHost($target) ?? $target;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolvePreferredMailHost(string $host): ?string
+    {
+        $ip = gethostbyname($host);
+
+        if ($ip === $host || ! filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return null;
+        }
+
+        $ptrHost = $this->normalizeHost(gethostbyaddr($ip) ?: null);
+
+        if ($ptrHost && $this->isResolvableHost($ptrHost)) {
+            return $ptrHost;
+        }
+
+        return null;
     }
 
     private function friendlyTransportMessage(string $message): string

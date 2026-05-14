@@ -51,7 +51,7 @@ class ReplySyncService
             return 0;
         }
 
-        $imapHost = $this->normalizeHost((string) $account->imap_host);
+        $imapHost = $this->resolveImapHost($account);
 
         if (! $imapHost || ! $this->isResolvableHost($imapHost)) {
             Log::warning('Reply sync skipped because IMAP host could not be resolved.', [
@@ -301,6 +301,67 @@ class ReplySyncService
     {
         return str_contains($fromAddress, 'mailer-daemon')
             || preg_match('/undeliver|delivery status|failure notice/i', $subject.' '.$body) === 1;
+    }
+
+    private function resolveImapHost(EmailAccount $account): ?string
+    {
+        $configuredHost = $this->normalizeHost((string) $account->imap_host);
+
+        if ($configuredHost && $this->isResolvableHost($configuredHost)) {
+            return $configuredHost;
+        }
+
+        $domain = strtolower(trim((string) substr(strrchr($account->email_address, '@') ?: '', 1)));
+
+        if ($domain === '') {
+            return null;
+        }
+
+        $records = dns_get_record($domain, DNS_MX);
+
+        if (! is_array($records) || $records === []) {
+            return null;
+        }
+
+        usort($records, fn (array $a, array $b) => ($a['pri'] ?? PHP_INT_MAX) <=> ($b['pri'] ?? PHP_INT_MAX));
+
+        foreach ($records as $record) {
+            $target = $this->normalizeHost((string) ($record['target'] ?? ''));
+
+            if ($target && $this->isResolvableHost($target)) {
+                $preferredTarget = $this->resolvePreferredMailHost($target) ?? $target;
+
+                if ($configuredHost && $configuredHost !== $target) {
+                    Log::warning('IMAP host did not resolve, so the domain MX host was used as a fallback.', [
+                        'email_account_id' => $account->id,
+                        'configured_host' => $configuredHost,
+                        'fallback_host' => $preferredTarget,
+                        'email_address' => $account->email_address,
+                    ]);
+                }
+
+                return $preferredTarget;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolvePreferredMailHost(string $host): ?string
+    {
+        $ip = gethostbyname($host);
+
+        if ($ip === $host || ! filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return null;
+        }
+
+        $ptrHost = $this->normalizeHost(gethostbyaddr($ip) ?: '');
+
+        if ($ptrHost && $this->isResolvableHost($ptrHost)) {
+            return $ptrHost;
+        }
+
+        return null;
     }
 
     private function applyContactState(Contact $contact, string $eventType, string $body): void

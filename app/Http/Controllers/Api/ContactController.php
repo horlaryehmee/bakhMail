@@ -18,11 +18,13 @@ use App\Services\TrackingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class ContactController extends Controller
 {
@@ -263,73 +265,25 @@ class ContactController extends Controller
             ]);
         }
 
-        $result = DB::transaction(function () use ($request, $validated, $account): array {
-            $contact = Contact::firstOrNew([
-                'user_id' => $request->user()->id,
-                'email' => strtolower($validated['email']),
+        $existingContact = Contact::query()
+            ->where('user_id', $request->user()->id)
+            ->where('email', strtolower($validated['email']))
+            ->first();
+
+        if ($existingContact && in_array($existingContact->status, ['unsubscribed', 'bounced'], true)) {
+            throw ValidationException::withMessages([
+                'email' => 'This contact cannot receive cold email because they are unsubscribed or bounced.',
             ]);
+        }
 
-            $contact->fill([
-                'first_name' => $validated['first_name'] ?? $contact->first_name,
-                'last_name' => $validated['last_name'] ?? $contact->last_name,
-                'company' => $validated['company'] ?? $contact->company,
-                'job_title' => $validated['job_title'] ?? $contact->job_title,
-                'phone' => $validated['phone'] ?? $contact->phone,
-                'website' => $validated['website'] ?? $contact->website,
-                'location' => $validated['location'] ?? $contact->location,
-                'notes' => $validated['notes'] ?? $contact->notes,
-                'status' => $validated['status'] ?? $contact->status ?? 'active',
-            ]);
-            $contact->save();
+        $htmlBody = trim((string) $validated['body_html']);
+        $text = trim((string) ($validated['body_text'] ?? strip_tags($htmlBody)));
+        $headers = [];
 
-            if (in_array($contact->status, ['unsubscribed', 'bounced'], true)) {
-                throw ValidationException::withMessages([
-                    'email' => 'This contact cannot receive cold email because they are unsubscribed or bounced.',
-                ]);
-            }
-
-            $thread = ConversationThread::firstOrCreate(
-                [
-                    'user_id' => $request->user()->id,
-                    'contact_id' => $contact->id,
-                    'campaign_id' => null,
-                ],
-                [
-                    'email_account_id' => $account->id,
-                    'subject' => $validated['subject'],
-                    'status' => 'open',
-                    'last_message_at' => now(),
-                ],
-            );
-
-            $log = EmailLog::create([
-                'user_id' => $request->user()->id,
-                'campaign_id' => null,
-                'campaign_step_id' => null,
-                'campaign_recipient_id' => null,
-                'contact_id' => $contact->id,
-                'email_account_id' => $account->id,
-                'conversation_thread_id' => $thread->id,
-                'direction' => 'outbound',
-                'event_type' => 'queued',
-                'subject' => $validated['subject'],
-                'recipient_email' => $contact->email,
-                'sender_email' => $account->email_address,
-                'tracking_token' => (string) Str::uuid(),
-                'unsubscribe_token' => $contact->unsubscribe_token,
-                'metadata' => [
-                    'body_html' => trim((string) $validated['body_html']),
-                    'body_text' => trim((string) ($validated['body_text'] ?? strip_tags((string) $validated['body_html']))),
-                ],
-            ]);
-
-            $htmlBody = trim((string) $validated['body_html']);
-            $text = trim((string) ($validated['body_text'] ?? strip_tags($htmlBody)));
-            $html = $this->trackingService->decorate($log, $htmlBody, [
-                'include_footer' => false,
-            ]);
-            $headers = [];
-            $lastMessageId = $thread->emailLogs()
+        if ($existingContact) {
+            $lastMessageId = EmailLog::query()
+                ->where('contact_id', $existingContact->id)
+                ->where('email_account_id', $account->id)
                 ->whereNotNull('provider_message_id')
                 ->latest('id')
                 ->value('provider_message_id');
@@ -338,66 +292,135 @@ class ContactController extends Controller
                 $headers['In-Reply-To'] = $lastMessageId;
                 $headers['References'] = $lastMessageId;
             }
+        }
 
-            try {
-                $sendResult = $this->dynamicSmtpMailer->send($account, [
-                    'to' => $contact->email,
-                    'subject' => $validated['subject'],
-                    'html' => $html,
-                    'text' => $text,
-                    'headers' => $headers,
-                ]);
-            } catch (RuntimeException $exception) {
-                throw ValidationException::withMessages([
-                    'email_account_id' => $exception->getMessage(),
-                ]);
-            }
-
-            $log->update([
-                'event_type' => 'sent',
-                'provider_message_id' => trim($sendResult['message_id'] ?? '', '<>'),
-                'body_preview' => mb_substr($text, 0, 240),
-                'sent_at' => now(),
-            ]);
-
-            $contact->update([
-                'last_contacted_at' => now(),
-            ]);
-
-            $thread->update([
-                'email_account_id' => $account->id,
+        try {
+            $sendResult = $this->dynamicSmtpMailer->send($account, [
+                'to' => strtolower($validated['email']),
                 'subject' => $validated['subject'],
-                'last_message_at' => now(),
-                'status' => 'open',
+                'html' => $htmlBody,
+                'text' => $text,
+                'headers' => $headers,
             ]);
+        } catch (RuntimeException $exception) {
+            throw ValidationException::withMessages([
+                'email_account_id' => $exception->getMessage(),
+            ]);
+        }
 
-            $this->activityLogger->log(
-                $request->user(),
-                'contacts.quick_email_sent',
-                $contact,
-                $request,
-                [
+        $result = [
+            'contact' => null,
+            'thread' => null,
+            'log' => null,
+        ];
+
+        try {
+            $result = DB::transaction(function () use ($request, $validated, $account, $text, $sendResult): array {
+                $contact = Contact::firstOrNew([
+                    'user_id' => $request->user()->id,
+                    'email' => strtolower($validated['email']),
+                ]);
+
+                if (! $contact->unsubscribe_token) {
+                    $contact->unsubscribe_token = (string) Str::uuid();
+                }
+
+                $contact->fill([
+                    'first_name' => $validated['first_name'] ?? $contact->first_name,
+                    'last_name' => $validated['last_name'] ?? $contact->last_name,
+                    'company' => $validated['company'] ?? $contact->company,
+                    'job_title' => $validated['job_title'] ?? $contact->job_title,
+                    'phone' => $validated['phone'] ?? $contact->phone,
+                    'website' => $validated['website'] ?? $contact->website,
+                    'location' => $validated['location'] ?? $contact->location,
+                    'notes' => $validated['notes'] ?? $contact->notes,
+                    'status' => $validated['status'] ?? $contact->status ?? 'active',
+                    'last_contacted_at' => now(),
+                ]);
+                $contact->save();
+
+                $thread = ConversationThread::firstOrCreate(
+                    [
+                        'user_id' => $request->user()->id,
+                        'contact_id' => $contact->id,
+                        'campaign_id' => null,
+                    ],
+                    [
+                        'email_account_id' => $account->id,
+                        'subject' => $validated['subject'],
+                        'status' => 'open',
+                        'last_message_at' => now(),
+                    ],
+                );
+
+                $log = EmailLog::create([
+                    'user_id' => $request->user()->id,
+                    'campaign_id' => null,
+                    'campaign_step_id' => null,
+                    'campaign_recipient_id' => null,
+                    'contact_id' => $contact->id,
                     'email_account_id' => $account->id,
-                    'thread_id' => $thread->id,
-                    'email_log_id' => $log->id,
-                ],
-                "Sent a quick cold email to {$contact->email}."
-            );
+                    'conversation_thread_id' => $thread->id,
+                    'direction' => 'outbound',
+                    'event_type' => 'sent',
+                    'subject' => $validated['subject'],
+                    'recipient_email' => $contact->email,
+                    'sender_email' => $account->email_address,
+                    'tracking_token' => (string) Str::uuid(),
+                    'unsubscribe_token' => $contact->unsubscribe_token,
+                    'provider_message_id' => trim($sendResult['message_id'] ?? '', '<>'),
+                    'body_preview' => mb_substr($text, 0, 240),
+                    'sent_at' => now(),
+                    'metadata' => [
+                        'body_html' => trim((string) $validated['body_html']),
+                        'body_text' => $text,
+                    ],
+                ]);
 
-            $contact->load(['tags', 'groups', 'latestEmailLog']);
+                $thread->update([
+                    'email_account_id' => $account->id,
+                    'subject' => $validated['subject'],
+                    'last_message_at' => now(),
+                    'status' => 'open',
+                ]);
 
-            return [
-                'contact' => $contact,
-                'thread' => $thread,
-                'log' => $log->fresh(),
-            ];
-        });
+                $this->activityLogger->log(
+                    $request->user(),
+                    'contacts.quick_email_sent',
+                    $contact,
+                    $request,
+                    [
+                        'email_account_id' => $account->id,
+                        'thread_id' => $thread->id,
+                        'email_log_id' => $log->id,
+                    ],
+                    "Sent a quick cold email to {$contact->email}."
+                );
+
+                $contact->load(['tags', 'groups', 'latestEmailLog']);
+
+                return [
+                    'contact' => $contact,
+                    'thread' => $thread,
+                    'log' => $log->fresh(),
+                ];
+            });
+        } catch (Throwable $exception) {
+            Log::warning('Quick mail was sent but activity could not be persisted.', [
+                'email_address' => strtolower($validated['email']),
+                'email_account_id' => $account->id,
+                'message_id' => $sendResult['message_id'] ?? null,
+                'error' => $exception->getMessage(),
+            ]);
+        }
 
         return response()->json([
             'data' => [
-                'contact' => $this->serializeContact($result['contact']),
-                'thread_id' => $result['thread']->id,
-                'email_log' => $this->serializeEmailLog($result['log']),
+                'status' => 'sent',
+                'message_id' => trim($sendResult['message_id'] ?? '', '<>'),
+                'contact' => $result['contact'] ? $this->serializeContact($result['contact']) : null,
+                'thread_id' => $result['thread']?->id,
+                'email_log' => $result['log'] ? $this->serializeEmailLog($result['log']) : null,
             ],
         ], 201);
     }
