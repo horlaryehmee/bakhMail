@@ -33,7 +33,16 @@ async function request(url, options = {}) {
     config.body = JSON.stringify(body);
   }
 
-  const response = await fetch(url, config);
+  let response;
+
+  try {
+    response = await fetch(url, config);
+  } catch (error) {
+    const wrapped = new Error('The server connection failed while processing the request. Check the app server and try again.');
+    wrapped.cause = error;
+    throw wrapped;
+  }
+
   const text = await response.text();
   const contentType = response.headers.get('content-type') || '';
   let payload = null;
@@ -62,9 +71,11 @@ async function request(url, options = {}) {
           ? 'The requested resource was not found.'
           : response.status === 422
             ? 'Please review the form and correct any invalid fields.'
-            : response.status
-              ? `Request failed (${response.status})`
-              : 'Request failed';
+            : response.status >= 500
+              ? `Server error (${response.status}). Check the Laravel log for the exact failure.`
+              : response.status
+                ? `The request could not be completed (${response.status}).`
+                : 'The request could not be completed.';
     const error = new Error(payload?.message || response.statusText || fallbackMessage);
     error.payload = payload;
     error.status = response.status;

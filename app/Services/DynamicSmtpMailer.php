@@ -77,6 +77,15 @@ class DynamicSmtpMailer
         $hosts = $this->resolveHostCandidates($account);
         $configuredHost = $this->normalizeHost($account->smtp_host);
 
+        if (! $account->smtp_port) {
+            return [
+                'ready' => false,
+                'host_resolves' => $hosts !== [],
+                'effective_host' => $hosts[0] ?? null,
+                'message' => 'SMTP port is missing. Add the mailbox SMTP port before sending.',
+            ];
+        }
+
         if ($hosts === []) {
             return [
                 'ready' => false,
@@ -109,6 +118,10 @@ class DynamicSmtpMailer
     {
         if ($account->provider === 'php_mail') {
             return ['native://default'];
+        }
+
+        if (! $account->smtp_port) {
+            return [];
         }
 
         $authSegment = '';
@@ -187,7 +200,7 @@ class DynamicSmtpMailer
             }
         }
 
-        $candidates = array_values(array_unique(array_filter($candidates)));
+        $candidates = array_slice(array_values(array_unique(array_filter($candidates))), 0, 3);
 
         if ($configuredHost && $candidates !== [] && $configuredHost !== $candidates[0]) {
             Log::warning('SMTP host did not resolve, so a fallback mail host will be used.', [

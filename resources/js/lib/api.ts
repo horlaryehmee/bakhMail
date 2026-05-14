@@ -22,16 +22,26 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     headers.set("Authorization", `Bearer ${options.token}`);
   }
 
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    method: options.method ?? "GET",
-    headers,
-    body: body ?? null,
-    cache: "no-store"
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${apiBaseUrl}${path}`, {
+      method: options.method ?? "GET",
+      headers,
+      body: body ?? null,
+      cache: "no-store"
+    });
+  } catch (error) {
+    throw new Error("The server connection failed while processing the request.", { cause: error });
+  }
 
   if (!response.ok) {
     const errorBody = (await response.json().catch(() => null)) as { message?: string } | null;
-    throw new Error(errorBody?.message ?? "Request failed");
+    const fallback = response.status >= 500
+      ? `Server error (${response.status}). Check the Laravel log for the exact failure.`
+      : `The request could not be completed (${response.status}).`;
+
+    throw new Error(errorBody?.message ?? fallback);
   }
 
   if (response.status === 204) {
