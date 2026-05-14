@@ -26,7 +26,13 @@ class ConversationController extends Controller
     {
         $threads = ConversationThread::query()
             ->where('user_id', $request->user()->id)
-            ->with(['contact', 'campaign', 'latestEmailLog', 'latestInboundEmailLog'])
+            ->with([
+                'contact',
+                'campaign',
+                'latestEmailLog',
+                'latestInboundEmailLog',
+                'emailLogs' => fn ($query) => $query->latest()->limit(50),
+            ])
             ->orderByDesc('last_message_at')
             ->get();
 
@@ -44,6 +50,7 @@ class ConversationController extends Controller
                 'campaign' => $thread->campaign ? ['id' => $thread->campaign->id, 'name' => $thread->campaign->name] : null,
                 'latest_message' => $thread->latestEmailLog ? $this->serializeMessage($thread->latestEmailLog) : null,
                 'latest_inbound_message' => $thread->latestInboundEmailLog ? $this->serializeMessage($thread->latestInboundEmailLog) : null,
+                'messages' => $thread->emailLogs->map(fn ($log) => $this->serializeMessage($log))->all(),
             ])->all(),
         ]);
     }

@@ -21,7 +21,6 @@ export function ConversationsPage() {
   const [activeThread, setActiveThread] = useState(null);
   const [replyForm, setReplyForm] = useState(createReplyForm());
   const [sendingReply, setSendingReply] = useState(false);
-  const [loadingThreadId, setLoadingThreadId] = useState(null);
   const [loadingThreads, setLoadingThreads] = useState(false);
 
   async function loadThreads(preferredThreadId = null) {
@@ -38,18 +37,10 @@ export function ConversationsPage() {
         : items[0] || null;
 
       if (nextThread) {
-        const activeSummary = {
-          ...nextThread,
-          messages: nextThread.latest_inbound_message
-            ? [nextThread.latest_inbound_message]
-            : nextThread.latest_message
-              ? [nextThread.latest_message]
-              : [],
-        };
         startTransition(() => {
-          setActiveThread((current) => current?.id === nextThread.id ? current : activeSummary);
+          setActiveThread(nextThread);
+          setReplyForm(createReplyForm(nextThread?.subject || ''));
         });
-        await loadThread(nextThread.id, { silent404: true });
       } else {
         startTransition(() => {
           setActiveThread(null);
@@ -60,42 +51,17 @@ export function ConversationsPage() {
     }
   }
 
-  async function loadThread(threadId, options = {}) {
-    if (!threadId) {
-      return;
-    }
+  function selectThread(threadId) {
+    const thread = threads.find((entry) => String(entry.id) === String(threadId)) || null;
 
-    const { silent404 = false } = options;
-    setLoadingThreadId(threadId);
-    try {
-      const response = await api.get(`/api/conversations/${threadId}`);
-      const thread = response.data || null;
-      startTransition(() => {
-        setActiveThread(thread);
-        setReplyForm(createReplyForm(thread?.subject || ''));
-      });
-    } catch (error) {
-      if (silent404 && error.status === 404) {
-        startTransition(() => {
-          setActiveThread(null);
-        });
-        return;
-      }
-
-      throw error;
-    } finally {
-      setLoadingThreadId(null);
-    }
+    startTransition(() => {
+      setActiveThread(thread);
+      setReplyForm(createReplyForm(thread?.subject || ''));
+    });
   }
 
   useEffect(() => {
-    loadThreads(location.state?.threadId || null).catch((error) => {
-      if (error.status === 404) {
-        return;
-      }
-
-      toast.error('Could not load reply threads');
-    });
+    loadThreads(location.state?.threadId || null).catch(() => toast.error('Could not load reply threads'));
   }, []);
 
   async function handleReply(event) {
@@ -154,7 +120,7 @@ export function ConversationsPage() {
                 <button
                   key={thread.id}
                   type="button"
-                  onClick={() => loadThread(thread.id).catch(() => toast.error('Could not load the selected reply thread'))}
+                  onClick={() => selectThread(thread.id)}
                   className={`w-full px-5 py-4 text-left transition sm:px-6 ${
                     activeThread?.id === thread.id ? 'bg-blue-50/80' : 'hover:bg-slate-50'
                   }`}
@@ -220,7 +186,7 @@ export function ConversationsPage() {
               ) : null}
 
               <div className="mt-5 space-y-4">
-                {activeThread.messages.map((message) => (
+                {(activeThread.messages || []).map((message) => (
                   <div
                     key={message.id}
                     className={`rounded-[24px] px-4 py-4 sm:px-5 ${
@@ -242,10 +208,6 @@ export function ConversationsPage() {
                   </div>
                 ))}
               </div>
-
-              {loadingThreadId === activeThread.id ? (
-                <div className="mt-4 text-sm text-slate-500">Refreshing conversation...</div>
-              ) : null}
 
               <form className="mt-6 border-t border-slate-200 pt-5" onSubmit={handleReply}>
                 <div className="space-y-4">
