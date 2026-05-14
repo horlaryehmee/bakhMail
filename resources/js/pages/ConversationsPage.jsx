@@ -9,6 +9,8 @@ import { api } from '../lib/api';
 
 const inboxFilters = [
   { id: 'all', label: 'All threads' },
+  { id: 'inbox', label: 'Inbox' },
+  { id: 'sent', label: 'Sent' },
   { id: 'needs_reply', label: 'Needs reply' },
   { id: 'replied', label: 'Replied' },
   { id: 'bounced', label: 'Bounced' },
@@ -81,6 +83,14 @@ function threadFilterMatches(thread, filterId) {
     return true;
   }
 
+  if (filterId === 'inbox') {
+    return latestDirection === 'inbound';
+  }
+
+  if (filterId === 'sent') {
+    return latestDirection === 'outbound';
+  }
+
   if (filterId === 'needs_reply') {
     return hasInbound && latestDirection === 'inbound' && !hasBounce;
   }
@@ -149,8 +159,10 @@ export function ConversationsPage() {
   const [replyForm, setReplyForm] = useState(createReplyForm());
   const [sendingReply, setSendingReply] = useState(false);
   const [loadingThreads, setLoadingThreads] = useState(false);
+  const [syncingMailbox, setSyncingMailbox] = useState(false);
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
+  const [accountFilter, setAccountFilter] = useState('all');
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
 
   async function loadThreads(preferredThreadId = null) {
@@ -181,13 +193,44 @@ export function ConversationsPage() {
 
   useEffect(() => {
     loadThreads(location.state?.threadId || null);
+    syncMailbox({ silent: true, preferredThreadId: location.state?.threadId || null });
   }, [location.state?.threadId]);
+
+  async function syncMailbox({ silent = false, preferredThreadId = null } = {}) {
+    setSyncingMailbox(true);
+
+    try {
+      const response = await api.post('/api/conversations/sync', {});
+
+      if (! silent) {
+        const count = response?.count ?? 0;
+        toast.success(count > 0 ? `Synced ${count} mailbox message${count === 1 ? '' : 's'}` : 'Mailbox sync completed');
+      }
+
+      await loadThreads(preferredThreadId || activeThreadId);
+    } catch (error) {
+      if (! silent) {
+        toast.error(error.payload?.message || error.message || 'Could not sync mailbox');
+      }
+    } finally {
+      setSyncingMailbox(false);
+    }
+  }
+
+  const mailboxAccounts = useMemo(() => {
+    const entries = threads
+      .map((thread) => thread.email_account)
+      .filter((account) => account?.id);
+
+    return entries.filter((account, index) => entries.findIndex((item) => item.id === account.id) === index);
+  }, [threads]);
 
   const filteredThreads = useMemo(
     () => threads
+      .filter((thread) => accountFilter === 'all' || String(thread.email_account?.id || '') === String(accountFilter))
       .filter((thread) => threadFilterMatches(thread, activeFilter))
       .filter((thread) => threadSearchMatches(thread, deferredSearch)),
-    [threads, activeFilter, deferredSearch],
+    [threads, accountFilter, activeFilter, deferredSearch],
   );
 
   const activeThread = useMemo(() => {
@@ -213,6 +256,8 @@ export function ConversationsPage() {
 
   const inboxStats = useMemo(() => ({
     total: threads.length,
+    inbox: threads.filter((thread) => threadFilterMatches(thread, 'inbox')).length,
+    sent: threads.filter((thread) => threadFilterMatches(thread, 'sent')).length,
     needsReply: threads.filter((thread) => threadFilterMatches(thread, 'needs_reply')).length,
     replied: threads.filter((thread) => threadFilterMatches(thread, 'replied')).length,
     bounced: threads.filter((thread) => threadFilterMatches(thread, 'bounced')).length,
@@ -285,8 +330,9 @@ export function ConversationsPage() {
         description="Open the newest inbound reply fast, keep the full conversation visible, and answer from the same workspace without waiting on a second thread request."
         stats={[
           { label: 'Threads', value: inboxStats.total },
+          { label: 'Inbox', value: inboxStats.inbox },
+          { label: 'Sent', value: inboxStats.sent },
           { label: 'Needs reply', value: inboxStats.needsReply },
-          { label: 'Replied', value: inboxStats.replied },
           { label: 'Bounces', value: inboxStats.bounced },
         ]}
       />
@@ -305,9 +351,9 @@ export function ConversationsPage() {
                 </div>
               </div>
 
-              <button type="button" className="ghost-button" onClick={() => loadThreads(activeThreadId)} disabled={loadingThreads}>
-                <RefreshCw size={16} className={loadingThreads ? 'animate-spin' : ''} />
-                <span>{loadingThreads ? 'Refreshing' : 'Refresh'}</span>
+              <button type="button" className="ghost-button" onClick={() => syncMailbox()} disabled={loadingThreads || syncingMailbox}>
+                <RefreshCw size={16} className={syncingMailbox ? 'animate-spin' : ''} />
+                <span>{syncingMailbox ? 'Syncing' : 'Sync mailbox'}</span>
               </button>
             </div>
 
@@ -334,6 +380,28 @@ export function ConversationsPage() {
                   </button>
                 ))}
               </div>
+
+              {mailboxAccounts.length ? (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className={`ghost-button ${accountFilter === 'all' ? '!border-blue-200 !bg-blue-50 !text-blue-700' : ''}`}
+                    onClick={() => setAccountFilter('all')}
+                  >
+                    All mailboxes
+                  </button>
+                  {mailboxAccounts.map((account) => (
+                    <button
+                      key={account.id}
+                      type="button"
+                      className={`ghost-button ${String(accountFilter) === String(account.id) ? '!border-blue-200 !bg-blue-50 !text-blue-700' : ''}`}
+                      onClick={() => setAccountFilter(String(account.id))}
+                    >
+                      {account.name || account.email_address}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -370,7 +438,7 @@ export function ConversationsPage() {
                     </div>
 
                     <div className="mt-3 flex items-center justify-between gap-3 text-xs uppercase tracking-[0.16em] text-slate-400">
-                      <span>{thread.campaign?.name || 'Direct conversation'}</span>
+                      <span>{thread.email_account?.email_address || thread.campaign?.name || 'Direct conversation'}</span>
                       <span>{formatDateTime(inbound?.sent_at || thread.last_message_at)}</span>
                     </div>
                   </button>
@@ -399,6 +467,9 @@ export function ConversationsPage() {
                     </p>
                     <p className="mt-1 text-sm leading-6 text-slate-500">
                       Source: {activeThread.campaign?.name || 'Direct conversation'}
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-slate-500">
+                      Mailbox: {activeThread.email_account?.email_address || 'Unknown mailbox'}
                     </p>
                   </div>
 

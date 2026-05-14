@@ -70,6 +70,7 @@ Route::prefix('api')->group(function (): void {
         Route::apiResource('campaigns', CampaignController::class);
 
         Route::get('/conversations', [ConversationController::class, 'index'])->name('api.conversations.index');
+        Route::post('/conversations/sync', [ConversationController::class, 'sync'])->name('api.conversations.sync');
         Route::get('/conversations/{thread}', [ConversationController::class, 'show'])->name('api.conversations.show');
         Route::post('/conversations/{thread}/reply', [ConversationController::class, 'reply'])->name('api.conversations.reply');
 

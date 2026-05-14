@@ -7,6 +7,7 @@ use App\Models\ConversationThread;
 use App\Models\EmailLog;
 use App\Services\ActivityLogger;
 use App\Services\DynamicSmtpMailer;
+use App\Services\ReplySyncService;
 use App\Services\TrackingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,16 +20,22 @@ class ConversationController extends Controller
         private readonly DynamicSmtpMailer $dynamicSmtpMailer,
         private readonly TrackingService $trackingService,
         private readonly ActivityLogger $activityLogger,
+        private readonly ReplySyncService $replySyncService,
     ) {
     }
 
     public function index(Request $request): JsonResponse
     {
+        if ($request->boolean('sync')) {
+            $this->replySyncService->syncUser($request->user());
+        }
+
         $threads = ConversationThread::query()
             ->where('user_id', $request->user()->id)
             ->with([
                 'contact',
                 'campaign',
+                'emailAccount',
                 'latestEmailLog',
                 'latestInboundEmailLog',
                 'emailLogs' => fn ($query) => $query->oldest('sent_at')->oldest('id')->limit(50),
@@ -47,6 +54,7 @@ class ConversationController extends Controller
         $thread->load([
             'contact',
             'campaign',
+            'emailAccount',
             'latestEmailLog',
             'latestInboundEmailLog',
             'emailLogs' => fn ($query) => $query->oldest('sent_at')->oldest('id')->limit(50),
@@ -54,6 +62,16 @@ class ConversationController extends Controller
 
         return response()->json([
             'data' => $this->serializeThread($thread),
+        ]);
+    }
+
+    public function sync(Request $request): JsonResponse
+    {
+        $count = $this->replySyncService->syncUser($request->user());
+
+        return response()->json([
+            'status' => 'synced',
+            'count' => $count,
         ]);
     }
 
@@ -192,6 +210,11 @@ class ConversationController extends Controller
                 'email' => $thread->contact?->email,
             ],
             'campaign' => $thread->campaign ? ['id' => $thread->campaign->id, 'name' => $thread->campaign->name] : null,
+            'email_account' => $thread->emailAccount ? [
+                'id' => $thread->emailAccount->id,
+                'name' => $thread->emailAccount->name,
+                'email_address' => $thread->emailAccount->email_address,
+            ] : null,
             'latest_message' => $latestMessage,
             'latest_inbound_message' => $latestInboundMessage,
             'messages' => $messages->all(),

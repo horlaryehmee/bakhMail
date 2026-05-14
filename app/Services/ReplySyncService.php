@@ -8,13 +8,22 @@ use App\Models\EmailAccount;
 use App\Models\EmailLog;
 use App\Models\SuppressionEntry;
 use App\Models\Tag;
+use App\Models\User;
 use App\Notifications\SystemEventNotification;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Throwable;
 
 class ReplySyncService
 {
+    private const INBOX_FOLDER_KEY = 'inbox';
+
+    private const SENT_FOLDER_KEY = 'sent';
+
+    private const BOOTSTRAP_MESSAGE_LIMIT = 75;
+
     public function __construct(
         private readonly AnalyticsService $analyticsService,
     ) {
@@ -36,6 +45,21 @@ class ReplySyncService
         return $synced;
     }
 
+    public function syncUser(User $user): int
+    {
+        $synced = 0;
+
+        $user->emailAccounts()
+            ->where('status', 'active')
+            ->whereNotNull('imap_host')
+            ->get()
+            ->each(function (EmailAccount $account) use (&$synced): void {
+                $synced += $this->syncAccount($account);
+            });
+
+        return $synced;
+    }
+
     public function syncAccount(EmailAccount $account): int
     {
         if (! $account->hasImapConfiguration()) {
@@ -43,7 +67,7 @@ class ReplySyncService
         }
 
         if (! function_exists('imap_open')) {
-            Log::warning('Reply sync skipped because the PHP IMAP extension is unavailable.', [
+            Log::warning('Mailbox sync skipped because the PHP IMAP extension is unavailable.', [
                 'email_account_id' => $account->id,
                 'email_address' => $account->email_address,
             ]);
@@ -54,7 +78,7 @@ class ReplySyncService
         $imapHost = $this->resolveImapHost($account);
 
         if (! $imapHost || ! $this->isResolvableHost($imapHost)) {
-            Log::warning('Reply sync skipped because IMAP host could not be resolved.', [
+            Log::warning('Mailbox sync skipped because IMAP host could not be resolved.', [
                 'email_account_id' => $account->id,
                 'imap_host' => $account->imap_host,
                 'email_address' => $account->email_address,
@@ -63,123 +87,345 @@ class ReplySyncService
             return 0;
         }
 
-        $mailbox = $this->mailboxPath($account, $imapHost);
-        $connection = $this->openMailbox($mailbox, $account, $imapHost);
-
-        if (! $connection) {
-            return 0;
-        }
-
+        $rootPath = $this->mailboxRootPath($account, $imapHost);
+        $mailboxes = $this->discoverMailboxNames($rootPath, $account, $imapHost);
+        $syncState = (array) (($account->metadata ?? [])['imap_sync_state'] ?? []);
         $synced = 0;
 
-        try {
-            $this->clearImapState();
-            $messageNumbers = imap_search($connection, 'UNSEEN') ?: [];
+        foreach ($mailboxes as $folderKey => $mailboxName) {
+            $mailbox = $rootPath.$mailboxName;
+            $connection = $this->openMailbox($mailbox, $account, $imapHost);
 
-            foreach ($messageNumbers as $messageNumber) {
-                $headerInfo = imap_headerinfo($connection, $messageNumber);
-                $headers = imap_fetchheader($connection, $messageNumber);
-                $body = $this->extractMessageBody($connection, $messageNumber);
-                $messageId = trim($this->extractHeaderValue($headers, 'Message-ID'), '<>');
-
-                if ($messageId && EmailLog::query()->where('provider_message_id', $messageId)->exists()) {
-                    continue;
-                }
-
-                $fromAddress = $this->headerAddress($headerInfo);
-                $contact = Contact::query()
-                    ->where('user_id', $account->user_id)
-                    ->where('email', strtolower($fromAddress))
-                    ->first();
-
-                if (! $contact) {
-                    continue;
-                }
-
-                $eventType = $this->isBounce($fromAddress, $headerInfo->subject ?? '', $body) ? 'bounced' : 'replied';
-                $inReplyTo = trim($this->extractHeaderValue($headers, 'In-Reply-To'), '<>');
-                $sourceLog = $inReplyTo ? EmailLog::query()->where('provider_message_id', $inReplyTo)->first() : null;
-                $messageTimestamp = $this->resolveMessageTimestamp($headerInfo?->date ?? null);
-                $thread = $sourceLog?->thread ?: ConversationThread::firstOrCreate(
-                    [
-                        'user_id' => $account->user_id,
-                        'contact_id' => $contact->id,
-                        'campaign_id' => $sourceLog?->campaign_id,
-                    ],
-                    [
-                        'email_account_id' => $account->id,
-                        'subject' => $headerInfo->subject ?? 'Reply',
-                        'status' => 'open',
-                        'last_message_at' => $messageTimestamp,
-                    ],
-                );
-
-                $log = EmailLog::create([
-                    'user_id' => $account->user_id,
-                    'campaign_id' => $sourceLog?->campaign_id,
-                    'campaign_step_id' => null,
-                    'campaign_recipient_id' => $sourceLog?->campaign_recipient_id,
-                    'contact_id' => $contact->id,
-                    'email_account_id' => $account->id,
-                    'conversation_thread_id' => $thread->id,
-                    'direction' => 'inbound',
-                    'event_type' => $eventType,
-                    'provider_message_id' => $messageId,
-                    'in_reply_to' => $inReplyTo ?: null,
-                    'subject' => $headerInfo->subject ?? null,
-                    'recipient_email' => $account->email_address,
-                    'sender_email' => $fromAddress,
-                    'body_preview' => mb_substr($body, 0, 250),
-                    'sent_at' => $messageTimestamp,
-                    'metadata' => [
-                        'body_text' => $body,
-                    ],
-                ]);
-
-                $thread->update([
-                    'last_message_at' => $messageTimestamp,
-                    'status' => $eventType === 'bounced' ? 'attention' : 'open',
-                ]);
-
-                $this->applyContactState($contact, $eventType, $body);
-                $this->applyRecipientState($sourceLog?->recipient, $eventType);
-                $this->applyAutoTag($contact, $eventType, $body);
-                $campaign = $sourceLog?->campaign ?? $thread->campaign;
-
-                if ($campaign) {
-                    $this->analyticsService->refreshCampaign($campaign);
-                }
-                $account->user->notify(new SystemEventNotification(
-                    title: $eventType === 'bounced' ? 'Bounce detected' : 'New reply received',
-                    message: $eventType === 'bounced'
-                        ? "{$contact->email} bounced from {$account->email_address}."
-                        : "{$contact->full_name} replied to {$account->email_address}.",
-                    level: $eventType === 'bounced' ? 'warning' : 'success',
-                    meta: ['thread_id' => $thread->id, 'email_log_id' => $log->id],
-                ));
-
-                @imap_setflag_full($connection, (string) $messageNumber, "\\Seen");
-                $synced++;
+            if (! $connection) {
+                continue;
             }
-        } catch (Throwable $exception) {
-            Log::warning('Reply sync stopped because an IMAP operation failed.', [
-                'email_account_id' => $account->id,
-                'imap_host' => $account->imap_host,
-                'email_address' => $account->email_address,
-                'message' => $exception->getMessage(),
-                'imap_errors' => $this->clearImapState(),
-            ]);
-        } finally {
-            @imap_close($connection);
-            $this->clearImapState();
+
+            try {
+                [$folderSynced, $lastUid] = $this->syncMailboxFolder($connection, $account, $folderKey, $mailboxName, (int) ($syncState[$folderKey]['last_uid'] ?? 0));
+                $synced += $folderSynced;
+                $syncState[$folderKey] = [
+                    'last_uid' => $lastUid,
+                    'mailbox' => $mailboxName,
+                    'synced_at' => now()->toIso8601String(),
+                ];
+            } catch (Throwable $exception) {
+                Log::warning('Mailbox sync stopped because an IMAP operation failed.', [
+                    'email_account_id' => $account->id,
+                    'mailbox' => $mailboxName,
+                    'imap_host' => $account->imap_host,
+                    'email_address' => $account->email_address,
+                    'message' => $exception->getMessage(),
+                    'imap_errors' => $this->clearImapState(),
+                ]);
+            } finally {
+                @imap_close($connection);
+                $this->clearImapState();
+            }
         }
 
-        $account->update(['last_synced_at' => now()]);
+        $metadata = (array) ($account->metadata ?? []);
+        $metadata['imap_sync_state'] = $syncState;
+        $metadata['imap_mailboxes'] = $mailboxes;
+
+        $account->update([
+            'last_synced_at' => now(),
+            'metadata' => $metadata,
+        ]);
 
         return $synced;
     }
 
-    private function mailboxPath(EmailAccount $account, string $imapHost): string
+    private function syncMailboxFolder($connection, EmailAccount $account, string $folderKey, string $mailboxName, int $lastUid): array
+    {
+        $messageNumbers = $this->messageNumbersForFolder($connection, $lastUid);
+        $maxUid = $lastUid;
+        $synced = 0;
+
+        foreach ($messageNumbers as $messageNumber) {
+            $uid = (int) imap_uid($connection, $messageNumber);
+            $maxUid = max($maxUid, $uid);
+
+            $headerInfo = imap_headerinfo($connection, $messageNumber);
+            $headers = (string) (imap_fetchheader($connection, $messageNumber) ?: '');
+            $messageId = trim($this->extractHeaderValue($headers, 'Message-ID'), '<>');
+            $providerMessageId = $messageId !== '' ? $messageId : sprintf('imap:%d:%s:%d', $account->id, $folderKey, $uid);
+
+            if (EmailLog::query()->where('provider_message_id', $providerMessageId)->exists()) {
+                continue;
+            }
+
+            $direction = $this->resolveDirection($folderKey, $headerInfo, $account);
+            $participant = $this->resolveParticipant($headerInfo, $direction, $account);
+
+            if (! $participant['email']) {
+                continue;
+            }
+
+            $contact = $this->findOrCreateContact($account, $participant['email'], $participant['name']);
+
+            if (! $contact) {
+                continue;
+            }
+
+            $body = $this->extractMessageBody($connection, $messageNumber);
+            $subject = $this->decodeMimeHeader((string) ($headerInfo->subject ?? '')) ?: null;
+            $references = $this->extractMessageReferences($headers);
+            $sourceLog = $this->findSourceLog($providerMessageId, $references);
+            $messageTimestamp = $this->resolveMessageTimestamp($headerInfo->date ?? null);
+            $thread = $this->resolveThread($account, $contact, $subject, $sourceLog, $messageTimestamp);
+            $eventType = $direction === 'inbound'
+                ? ($this->isBounce($participant['email'], $subject ?? '', $body) ? 'bounced' : 'replied')
+                : 'sent';
+
+            $log = EmailLog::create([
+                'user_id' => $account->user_id,
+                'campaign_id' => $sourceLog?->campaign_id,
+                'campaign_step_id' => $sourceLog?->campaign_step_id,
+                'campaign_recipient_id' => $sourceLog?->campaign_recipient_id,
+                'contact_id' => $contact->id,
+                'email_account_id' => $account->id,
+                'conversation_thread_id' => $thread->id,
+                'direction' => $direction,
+                'event_type' => $eventType,
+                'provider_message_id' => $providerMessageId,
+                'in_reply_to' => $references->first(),
+                'subject' => $subject,
+                'recipient_email' => $direction === 'outbound' ? $participant['email'] : $account->email_address,
+                'sender_email' => $direction === 'outbound' ? $account->email_address : $participant['email'],
+                'body_preview' => mb_substr($body, 0, 250),
+                'sent_at' => $messageTimestamp,
+                'metadata' => [
+                    'body_text' => $body,
+                    'imap_mailbox' => $mailboxName,
+                    'imap_folder' => $folderKey,
+                    'imap_uid' => $uid,
+                    'message_references' => $references->values()->all(),
+                ],
+            ]);
+
+            $thread->update([
+                'email_account_id' => $account->id,
+                'subject' => $subject ?: ($thread->subject ?: 'Conversation'),
+                'last_message_at' => $messageTimestamp,
+                'status' => $eventType === 'bounced' ? 'attention' : 'open',
+            ]);
+
+            if ($direction === 'inbound') {
+                $this->applyInboundState($account, $contact, $eventType, $body, $thread, $log, $sourceLog);
+            }
+
+            $synced++;
+        }
+
+        return [$synced, $maxUid];
+    }
+
+    private function messageNumbersForFolder($connection, int $lastUid): array
+    {
+        $messageNumbers = imap_search($connection, 'ALL') ?: [];
+
+        if ($messageNumbers === []) {
+            return [];
+        }
+
+        $messages = collect($messageNumbers)
+            ->map(fn ($messageNumber) => [
+                'number' => (int) $messageNumber,
+                'uid' => (int) imap_uid($connection, (int) $messageNumber),
+            ])
+            ->sortBy('uid')
+            ->values();
+
+        if ($lastUid > 0) {
+            return $messages
+                ->filter(fn (array $message) => $message['uid'] > $lastUid)
+                ->pluck('number')
+                ->all();
+        }
+
+        return $messages
+            ->slice(-self::BOOTSTRAP_MESSAGE_LIMIT)
+            ->pluck('number')
+            ->all();
+    }
+
+    private function resolveDirection(string $folderKey, object $headerInfo, EmailAccount $account): string
+    {
+        if ($folderKey === self::SENT_FOLDER_KEY) {
+            return 'outbound';
+        }
+
+        $fromAddress = strtolower((string) ($this->addressesFromHeader($headerInfo->from ?? [])->first()['email'] ?? ''));
+
+        return $fromAddress === strtolower($account->email_address) ? 'outbound' : 'inbound';
+    }
+
+    private function resolveParticipant(object $headerInfo, string $direction, EmailAccount $account): array
+    {
+        if ($direction === 'outbound') {
+            $recipient = $this->addressesFromHeader($headerInfo->to ?? [])
+                ->first(fn (array $address) => $address['email'] !== strtolower($account->email_address));
+
+            return $recipient ?? ['email' => null, 'name' => null];
+        }
+
+        return $this->addressesFromHeader($headerInfo->from ?? [])->first() ?? ['email' => null, 'name' => null];
+    }
+
+    private function addressesFromHeader(array $addresses): Collection
+    {
+        return collect($addresses)
+            ->map(function ($address): array {
+                $email = strtolower(trim(($address->mailbox ?? '').'@'.($address->host ?? '')));
+                $name = $this->decodeMimeHeader((string) ($address->personal ?? ''));
+
+                return [
+                    'email' => filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : null,
+                    'name' => $name ?: null,
+                ];
+            })
+            ->filter(fn (array $address) => filled($address['email']))
+            ->values();
+    }
+
+    private function findOrCreateContact(EmailAccount $account, string $email, ?string $name): ?Contact
+    {
+        $email = strtolower(trim($email));
+
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return null;
+        }
+
+        $contact = Contact::query()->firstOrNew([
+            'user_id' => $account->user_id,
+            'email' => $email,
+        ]);
+
+        if ($contact->exists) {
+            return $contact;
+        }
+
+        [$firstName, $lastName] = $this->splitName($name);
+
+        $contact->fill([
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'status' => 'active',
+        ]);
+        $contact->save();
+
+        return $contact;
+    }
+
+    private function splitName(?string $name): array
+    {
+        $name = trim((string) $name);
+
+        if ($name === '') {
+            return [null, null];
+        }
+
+        $parts = preg_split('/\s+/', $name) ?: [];
+        $firstName = array_shift($parts) ?: null;
+        $lastName = $parts !== [] ? implode(' ', $parts) : null;
+
+        return [$firstName, $lastName];
+    }
+
+    private function resolveThread(
+        EmailAccount $account,
+        Contact $contact,
+        ?string $subject,
+        ?EmailLog $sourceLog,
+        CarbonImmutable $messageTimestamp,
+    ): ConversationThread {
+        if ($sourceLog?->thread) {
+            return $sourceLog->thread;
+        }
+
+        $normalizedSubject = $this->normalizeSubject($subject);
+
+        $existing = ConversationThread::query()
+            ->where('user_id', $account->user_id)
+            ->where('contact_id', $contact->id)
+            ->where('email_account_id', $account->id)
+            ->get()
+            ->first(function (ConversationThread $thread) use ($normalizedSubject): bool {
+                return $this->normalizeSubject($thread->subject) === $normalizedSubject;
+            });
+
+        if ($existing) {
+            return $existing;
+        }
+
+        return ConversationThread::create([
+            'user_id' => $account->user_id,
+            'contact_id' => $contact->id,
+            'campaign_id' => $sourceLog?->campaign_id,
+            'email_account_id' => $account->id,
+            'subject' => $subject ?: 'Conversation',
+            'status' => 'open',
+            'last_message_at' => $messageTimestamp,
+        ]);
+    }
+
+    private function normalizeSubject(?string $subject): string
+    {
+        $subject = strtolower(trim((string) $subject));
+
+        if ($subject === '') {
+            return '';
+        }
+
+        do {
+            $previous = $subject;
+            $subject = preg_replace('/^(re|fwd|fw)\s*:\s*/i', '', $subject) ?? $subject;
+        } while ($subject !== $previous);
+
+        return $subject;
+    }
+
+    private function findSourceLog(string $providerMessageId, Collection $references): ?EmailLog
+    {
+        $referenceIds = $references
+            ->prepend($providerMessageId)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($referenceIds->isEmpty()) {
+            return null;
+        }
+
+        return EmailLog::query()
+            ->whereIn('provider_message_id', $referenceIds->all())
+            ->latest('sent_at')
+            ->latest('id')
+            ->first();
+    }
+
+    private function extractMessageReferences(string $headers): Collection
+    {
+        $references = [];
+
+        foreach (['In-Reply-To', 'References'] as $headerName) {
+            $value = $this->extractHeaderValue($headers, $headerName);
+
+            if ($value === '') {
+                continue;
+            }
+
+            preg_match_all('/<([^>]+)>/', $value, $matches);
+
+            foreach (($matches[1] ?? []) as $messageId) {
+                $references[] = trim($messageId);
+            }
+        }
+
+        return collect($references)->filter()->unique()->values();
+    }
+
+    private function mailboxRootPath(EmailAccount $account, string $imapHost): string
     {
         $flag = match ($account->imap_encryption) {
             'ssl' => '/imap/ssl',
@@ -187,7 +433,68 @@ class ReplySyncService
             default => '/imap/notls',
         };
 
-        return sprintf('{%s:%d%s}INBOX', $imapHost, $account->imap_port, $flag);
+        return sprintf('{%s:%d%s}', $imapHost, $account->imap_port, $flag);
+    }
+
+    private function discoverMailboxNames(string $rootPath, EmailAccount $account, string $imapHost): array
+    {
+        $mailboxes = [];
+        $connection = $this->openMailbox($rootPath.'INBOX', $account, $imapHost);
+
+        if (! $connection) {
+            return [
+                self::INBOX_FOLDER_KEY => 'INBOX',
+            ];
+        }
+
+        try {
+            $rawMailboxes = imap_getmailboxes($connection, $rootPath, '*') ?: [];
+            $names = collect($rawMailboxes)
+                ->map(fn ($mailbox) => str_replace($rootPath, '', imap_utf7_decode($mailbox->name)))
+                ->filter()
+                ->values();
+
+            $mailboxes[self::INBOX_FOLDER_KEY] = $names->first(fn (string $name) => strtoupper($name) === 'INBOX') ?: 'INBOX';
+
+            $sentCandidates = [
+                'sent',
+                'sent items',
+                'sent mail',
+                'sent messages',
+                'inbox.sent',
+                'inbox/sent',
+                'mail/sent',
+            ];
+
+            $normalizedNames = $names->mapWithKeys(fn (string $name) => [$this->normalizeMailboxName($name) => $name]);
+
+            foreach ($sentCandidates as $candidate) {
+                $matched = $normalizedNames->get($this->normalizeMailboxName($candidate));
+
+                if ($matched) {
+                    $mailboxes[self::SENT_FOLDER_KEY] = $matched;
+                    break;
+                }
+            }
+
+            if (! isset($mailboxes[self::SENT_FOLDER_KEY])) {
+                $matched = $names->first(fn (string $name) => str_contains($this->normalizeMailboxName($name), 'sent'));
+
+                if ($matched) {
+                    $mailboxes[self::SENT_FOLDER_KEY] = $matched;
+                }
+            }
+        } finally {
+            @imap_close($connection);
+            $this->clearImapState();
+        }
+
+        return $mailboxes;
+    }
+
+    private function normalizeMailboxName(string $name): string
+    {
+        return strtolower(trim(str_replace(['\\', '/'], '.', $name)));
     }
 
     private function openMailbox(string $mailbox, EmailAccount $account, string $imapHost): mixed
@@ -208,8 +515,9 @@ class ReplySyncService
         }
 
         if (! $connection) {
-            Log::warning('Reply sync could not open IMAP mailbox.', [
+            Log::warning('Mailbox sync could not open IMAP mailbox.', [
                 'email_account_id' => $account->id,
+                'mailbox' => $mailbox,
                 'imap_host' => $imapHost,
                 'email_address' => $account->email_address,
                 'warning' => $lastWarning,
@@ -220,18 +528,22 @@ class ReplySyncService
         return $connection;
     }
 
-    private function headerAddress(object $headerInfo): string
-    {
-        $from = $headerInfo->from[0] ?? null;
-
-        return strtolower(trim(($from->mailbox ?? '').'@'.($from->host ?? '')));
-    }
-
     private function extractHeaderValue(string $headers, string $name): string
     {
         preg_match('/^'.preg_quote($name, '/').':\s*(.+)$/mi', $headers, $matches);
 
         return trim($matches[1] ?? '');
+    }
+
+    private function decodeMimeHeader(string $value): string
+    {
+        if ($value === '') {
+            return '';
+        }
+
+        $decoded = @iconv_mime_decode($value, ICONV_MIME_DECODE_CONTINUE_ON_ERROR, 'UTF-8');
+
+        return trim($decoded !== false ? $decoded : $value);
     }
 
     private function isResolvableHost(string $host): bool
@@ -280,13 +592,72 @@ class ReplySyncService
 
     private function extractMessageBody($connection, int $messageNumber): string
     {
-        $body = imap_body($connection, $messageNumber) ?: '';
-        $decoded = quoted_printable_decode($body);
-        $decoded = base64_decode($decoded, true) ?: $decoded;
-        $decoded = preg_replace("/\r\n|\r/u", "\n", strip_tags($decoded)) ?? '';
-        $decoded = preg_replace("/\n{3,}/u", "\n\n", $decoded) ?? $decoded;
+        $structure = imap_fetchstructure($connection, $messageNumber);
 
-        return trim($decoded);
+        if (! $structure) {
+            return $this->cleanBody((string) (imap_body($connection, $messageNumber) ?: ''));
+        }
+
+        $plainText = $this->findBodyPart($connection, $messageNumber, $structure, 'plain');
+
+        if ($plainText !== null) {
+            return $plainText;
+        }
+
+        $html = $this->findBodyPart($connection, $messageNumber, $structure, 'html');
+
+        if ($html !== null) {
+            return $this->cleanBody(strip_tags($html));
+        }
+
+        return $this->cleanBody((string) (imap_body($connection, $messageNumber) ?: ''));
+    }
+
+    private function findBodyPart($connection, int $messageNumber, object $structure, string $preferredSubtype, string $partNumber = ''): ?string
+    {
+        $subtype = strtolower((string) ($structure->subtype ?? ''));
+
+        if (($structure->type ?? null) === 0 && $subtype === $preferredSubtype) {
+            $body = $partNumber !== ''
+                ? (imap_fetchbody($connection, $messageNumber, $partNumber) ?: '')
+                : (imap_body($connection, $messageNumber) ?: '');
+
+            return $this->decodePartBody($body, (int) ($structure->encoding ?? 0), $preferredSubtype === 'html');
+        }
+
+        foreach (($structure->parts ?? []) as $index => $part) {
+            $childPartNumber = $partNumber === '' ? (string) ($index + 1) : $partNumber.'.'.($index + 1);
+            $body = $this->findBodyPart($connection, $messageNumber, $part, $preferredSubtype, $childPartNumber);
+
+            if ($body !== null) {
+                return $body;
+            }
+        }
+
+        return null;
+    }
+
+    private function decodePartBody(string $body, int $encoding, bool $isHtml): string
+    {
+        $decoded = match ($encoding) {
+            3 => base64_decode($body, true) ?: $body,
+            4 => quoted_printable_decode($body),
+            default => $body,
+        };
+
+        if ($isHtml) {
+            $decoded = strip_tags($decoded);
+        }
+
+        return $this->cleanBody($decoded);
+    }
+
+    private function cleanBody(string $body): string
+    {
+        $body = preg_replace("/\r\n|\r/u", "\n", $body) ?? $body;
+        $body = preg_replace("/\n{3,}/u", "\n\n", $body) ?? $body;
+
+        return trim($body);
     }
 
     private function clearImapState(): array
@@ -362,6 +733,34 @@ class ReplySyncService
         }
 
         return null;
+    }
+
+    private function applyInboundState(
+        EmailAccount $account,
+        Contact $contact,
+        string $eventType,
+        string $body,
+        ConversationThread $thread,
+        EmailLog $log,
+        ?EmailLog $sourceLog,
+    ): void {
+        $this->applyContactState($contact, $eventType, $body);
+        $this->applyRecipientState($sourceLog?->recipient, $eventType);
+        $this->applyAutoTag($contact, $eventType, $body);
+        $campaign = $sourceLog?->campaign ?? $thread->campaign;
+
+        if ($campaign) {
+            $this->analyticsService->refreshCampaign($campaign);
+        }
+
+        $account->user->notify(new SystemEventNotification(
+            title: $eventType === 'bounced' ? 'Bounce detected' : 'New reply received',
+            message: $eventType === 'bounced'
+                ? "{$contact->email} bounced from {$account->email_address}."
+                : "{$contact->full_name} replied to {$account->email_address}.",
+            level: $eventType === 'bounced' ? 'warning' : 'success',
+            meta: ['thread_id' => $thread->id, 'email_log_id' => $log->id],
+        ));
     }
 
     private function applyContactState(Contact $contact, string $eventType, string $body): void
