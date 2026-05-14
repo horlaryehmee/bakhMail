@@ -26,7 +26,7 @@ class ConversationController extends Controller
     {
         $threads = ConversationThread::query()
             ->where('user_id', $request->user()->id)
-            ->with(['contact', 'campaign', 'emailLogs' => fn ($query) => $query->latest()->limit(3)])
+            ->with(['contact', 'campaign', 'latestEmailLog', 'latestInboundEmailLog'])
             ->orderByDesc('last_message_at')
             ->get();
 
@@ -42,15 +42,8 @@ class ConversationController extends Controller
                     'email' => $thread->contact?->email,
                 ],
                 'campaign' => $thread->campaign ? ['id' => $thread->campaign->id, 'name' => $thread->campaign->name] : null,
-                'messages' => $thread->emailLogs->map(fn ($log) => [
-                    'id' => $log->id,
-                    'direction' => $log->direction,
-                    'event_type' => $log->event_type,
-                    'subject' => $log->subject,
-                    'body_preview' => $log->body_preview,
-                    'body_text' => $log->metadata['body_text'] ?? null,
-                    'sent_at' => $log->sent_at?->toIso8601String(),
-                ])->all(),
+                'latest_message' => $thread->latestEmailLog ? $this->serializeMessage($thread->latestEmailLog) : null,
+                'latest_inbound_message' => $thread->latestInboundEmailLog ? $this->serializeMessage($thread->latestInboundEmailLog) : null,
             ])->all(),
         ]);
     }
@@ -58,30 +51,27 @@ class ConversationController extends Controller
     public function show(Request $request, ConversationThread $thread): JsonResponse
     {
         abort_unless($thread->user_id === $request->user()->id, 404);
-        $thread->load(['contact', 'campaign', 'emailLogs' => fn ($query) => $query->latest()->limit(50)]);
+        $thread->load([
+            'contact',
+            'campaign',
+            'latestInboundEmailLog',
+            'emailLogs' => fn ($query) => $query->latest()->limit(50),
+        ]);
 
         return response()->json([
             'data' => [
                 'id' => $thread->id,
                 'subject' => $thread->subject,
                 'status' => $thread->status,
+                'last_message_at' => $thread->last_message_at?->toIso8601String(),
                 'contact' => [
                     'id' => $thread->contact?->id,
                     'name' => $thread->contact?->full_name,
                     'email' => $thread->contact?->email,
                 ],
                 'campaign' => $thread->campaign ? ['id' => $thread->campaign->id, 'name' => $thread->campaign->name] : null,
-                'messages' => $thread->emailLogs->map(fn ($log) => [
-                    'id' => $log->id,
-                    'direction' => $log->direction,
-                    'event_type' => $log->event_type,
-                    'subject' => $log->subject,
-                    'body_preview' => $log->body_preview,
-                    'body_text' => $log->metadata['body_text'] ?? null,
-                    'sender_email' => $log->sender_email,
-                    'recipient_email' => $log->recipient_email,
-                    'sent_at' => $log->sent_at?->toIso8601String(),
-                ])->all(),
+                'latest_inbound_message' => $thread->latestInboundEmailLog ? $this->serializeMessage($thread->latestInboundEmailLog) : null,
+                'messages' => $thread->emailLogs->map(fn ($log) => $this->serializeMessage($log))->all(),
             ],
         ]);
     }
@@ -185,5 +175,20 @@ class ConversationController extends Controller
         );
 
         return $this->show($request, $thread->fresh());
+    }
+
+    private function serializeMessage(EmailLog $log): array
+    {
+        return [
+            'id' => $log->id,
+            'direction' => $log->direction,
+            'event_type' => $log->event_type,
+            'subject' => $log->subject,
+            'body_preview' => $log->body_preview,
+            'body_text' => $log->metadata['body_text'] ?? null,
+            'sender_email' => $log->sender_email,
+            'recipient_email' => $log->recipient_email,
+            'sent_at' => $log->sent_at?->toIso8601String(),
+        ];
     }
 }

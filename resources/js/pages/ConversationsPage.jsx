@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Inbox, MessageSquareText, Send } from 'lucide-react';
+import { startTransition, useEffect, useState } from 'react';
+import { Inbox, Send } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { PageHeader } from '../components/PageHeader';
@@ -21,28 +21,53 @@ export function ConversationsPage() {
   const [activeThread, setActiveThread] = useState(null);
   const [replyForm, setReplyForm] = useState(createReplyForm());
   const [sendingReply, setSendingReply] = useState(false);
+  const [loadingThreadId, setLoadingThreadId] = useState(null);
+  const [loadingThreads, setLoadingThreads] = useState(false);
 
   async function loadThreads(preferredThreadId = null) {
+    setLoadingThreads(true);
     const response = await api.get('/api/conversations');
     const items = response.data || [];
-    setThreads(items);
+    startTransition(() => {
+      setThreads(items);
+    });
 
     const nextThread = preferredThreadId
       ? items.find((thread) => thread.id === preferredThreadId) || items[0] || null
       : items[0] || null;
 
     if (nextThread) {
-      await loadThread(nextThread.id);
+      const activeSummary = {
+        ...nextThread,
+        messages: nextThread.latest_inbound_message
+          ? [nextThread.latest_inbound_message]
+          : nextThread.latest_message
+            ? [nextThread.latest_message]
+            : [],
+      };
+      startTransition(() => {
+        setActiveThread((current) => current?.id === nextThread.id ? current : activeSummary);
+      });
+      loadThread(nextThread.id).catch(() => toast.error('Could not load the selected reply thread'));
     } else {
       setActiveThread(null);
     }
+
+    setLoadingThreads(false);
   }
 
   async function loadThread(threadId) {
-    const response = await api.get(`/api/conversations/${threadId}`);
-    const thread = response.data || null;
-    setActiveThread(thread);
-    setReplyForm(createReplyForm(thread?.subject || ''));
+    setLoadingThreadId(threadId);
+    try {
+      const response = await api.get(`/api/conversations/${threadId}`);
+      const thread = response.data || null;
+      startTransition(() => {
+        setActiveThread(thread);
+        setReplyForm(createReplyForm(thread?.subject || ''));
+      });
+    } finally {
+      setLoadingThreadId(null);
+    }
   }
 
   useEffect(() => {
@@ -118,13 +143,20 @@ export function ConversationsPage() {
                     <StatusBadge status={thread.status} />
                   </div>
                   <p className="mt-3 text-sm leading-6 text-slate-500">
-                    {thread.messages?.[0]?.body_preview || 'No preview yet.'}
+                    {thread.latest_inbound_message?.body_preview || thread.latest_inbound_message?.body_text || 'No inbound reply yet.'}
                   </p>
+                  {thread.latest_inbound_message?.sent_at ? (
+                    <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-400">
+                      Last inbound {new Date(thread.latest_inbound_message.sent_at).toLocaleString()}
+                    </p>
+                  ) : null}
                 </button>
               ))
             ) : (
               <div className="p-6">
-                <div className="empty-panel p-6 text-center text-sm">No reply threads yet.</div>
+                <div className="empty-panel p-6 text-center text-sm">
+                  {loadingThreads ? 'Loading reply threads...' : 'No reply threads yet.'}
+                </div>
               </div>
             )}
           </div>
@@ -146,6 +178,23 @@ export function ConversationsPage() {
                 </div>
               </div>
 
+              {activeThread.latest_inbound_message ? (
+                <div className="mt-5 rounded-[24px] border border-emerald-200 bg-emerald-50/80 px-4 py-4 sm:px-5">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Latest inbound reply</span>
+                    <span className="text-sm text-emerald-800">
+                      {activeThread.latest_inbound_message.sent_at
+                        ? new Date(activeThread.latest_inbound_message.sent_at).toLocaleString()
+                        : 'Pending'}
+                    </span>
+                  </div>
+                  <h3 className="mt-3 text-lg font-semibold text-slate-950">{activeThread.latest_inbound_message.subject}</h3>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">
+                    {activeThread.latest_inbound_message.body_text || activeThread.latest_inbound_message.body_preview || 'No inbound body available yet.'}
+                  </p>
+                </div>
+              ) : null}
+
               <div className="mt-5 space-y-4">
                 {activeThread.messages.map((message) => (
                   <div
@@ -156,7 +205,7 @@ export function ConversationsPage() {
                   >
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                        {message.direction}
+                        {message.direction === 'inbound' ? 'reply received' : 'message sent'}
                       </span>
                       <span className="text-sm text-slate-500">
                         {message.sent_at ? new Date(message.sent_at).toLocaleString() : 'Pending'}
@@ -169,6 +218,10 @@ export function ConversationsPage() {
                   </div>
                 ))}
               </div>
+
+              {loadingThreadId === activeThread.id ? (
+                <div className="mt-4 text-sm text-slate-500">Refreshing conversation...</div>
+              ) : null}
 
               <form className="mt-6 border-t border-slate-200 pt-5" onSubmit={handleReply}>
                 <div className="space-y-4">

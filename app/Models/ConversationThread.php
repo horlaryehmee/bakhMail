@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ConversationThread extends Model
 {
@@ -51,5 +52,17 @@ class ConversationThread extends Model
     public function emailLogs(): HasMany
     {
         return $this->hasMany(EmailLog::class);
+    }
+
+    public function latestEmailLog(): HasOne
+    {
+        return $this->hasOne(EmailLog::class)->latestOfMany('id');
+    }
+
+    public function latestInboundEmailLog(): HasOne
+    {
+        return $this->hasOne(EmailLog::class)
+            ->where('direction', 'inbound')
+            ->latestOfMany('id');
     }
 }
