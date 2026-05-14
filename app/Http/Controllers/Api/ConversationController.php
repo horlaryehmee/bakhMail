@@ -31,27 +31,13 @@ class ConversationController extends Controller
                 'campaign',
                 'latestEmailLog',
                 'latestInboundEmailLog',
-                'emailLogs' => fn ($query) => $query->latest()->limit(50),
+                'emailLogs' => fn ($query) => $query->oldest('sent_at')->oldest('id')->limit(50),
             ])
             ->orderByDesc('last_message_at')
             ->get();
 
         return response()->json([
-            'data' => $threads->map(fn (ConversationThread $thread) => [
-                'id' => $thread->id,
-                'subject' => $thread->subject,
-                'status' => $thread->status,
-                'last_message_at' => $thread->last_message_at?->toIso8601String(),
-                'contact' => [
-                    'id' => $thread->contact?->id,
-                    'name' => $thread->contact?->full_name,
-                    'email' => $thread->contact?->email,
-                ],
-                'campaign' => $thread->campaign ? ['id' => $thread->campaign->id, 'name' => $thread->campaign->name] : null,
-                'latest_message' => $thread->latestEmailLog ? $this->serializeMessage($thread->latestEmailLog) : null,
-                'latest_inbound_message' => $thread->latestInboundEmailLog ? $this->serializeMessage($thread->latestInboundEmailLog) : null,
-                'messages' => $thread->emailLogs->map(fn ($log) => $this->serializeMessage($log))->all(),
-            ])->all(),
+            'data' => $threads->map(fn (ConversationThread $thread) => $this->serializeThread($thread))->all(),
         ]);
     }
 
@@ -61,25 +47,13 @@ class ConversationController extends Controller
         $thread->load([
             'contact',
             'campaign',
+            'latestEmailLog',
             'latestInboundEmailLog',
-            'emailLogs' => fn ($query) => $query->latest()->limit(50),
+            'emailLogs' => fn ($query) => $query->oldest('sent_at')->oldest('id')->limit(50),
         ]);
 
         return response()->json([
-            'data' => [
-                'id' => $thread->id,
-                'subject' => $thread->subject,
-                'status' => $thread->status,
-                'last_message_at' => $thread->last_message_at?->toIso8601String(),
-                'contact' => [
-                    'id' => $thread->contact?->id,
-                    'name' => $thread->contact?->full_name,
-                    'email' => $thread->contact?->email,
-                ],
-                'campaign' => $thread->campaign ? ['id' => $thread->campaign->id, 'name' => $thread->campaign->name] : null,
-                'latest_inbound_message' => $thread->latestInboundEmailLog ? $this->serializeMessage($thread->latestInboundEmailLog) : null,
-                'messages' => $thread->emailLogs->map(fn ($log) => $this->serializeMessage($log))->all(),
-            ],
+            'data' => $this->serializeThread($thread),
         ]);
     }
 
@@ -196,6 +170,37 @@ class ConversationController extends Controller
             'sender_email' => $log->sender_email,
             'recipient_email' => $log->recipient_email,
             'sent_at' => $log->sent_at?->toIso8601String(),
+        ];
+    }
+
+    private function serializeThread(ConversationThread $thread): array
+    {
+        $messages = $thread->emailLogs->map(fn ($log) => $this->serializeMessage($log))->values();
+        $latestMessage = $thread->latestEmailLog ? $this->serializeMessage($thread->latestEmailLog) : null;
+        $latestInboundMessage = $thread->latestInboundEmailLog ? $this->serializeMessage($thread->latestInboundEmailLog) : null;
+        $inboundCount = $thread->emailLogs->where('direction', 'inbound')->count();
+        $outboundCount = $thread->emailLogs->where('direction', 'outbound')->count();
+
+        return [
+            'id' => $thread->id,
+            'subject' => $thread->subject,
+            'status' => $thread->status,
+            'last_message_at' => $thread->last_message_at?->toIso8601String(),
+            'contact' => [
+                'id' => $thread->contact?->id,
+                'name' => $thread->contact?->full_name,
+                'email' => $thread->contact?->email,
+            ],
+            'campaign' => $thread->campaign ? ['id' => $thread->campaign->id, 'name' => $thread->campaign->name] : null,
+            'latest_message' => $latestMessage,
+            'latest_inbound_message' => $latestInboundMessage,
+            'messages' => $messages->all(),
+            'stats' => [
+                'message_count' => $messages->count(),
+                'inbound_count' => $inboundCount,
+                'outbound_count' => $outboundCount,
+                'has_inbound_reply' => $latestInboundMessage !== null,
+            ],
         ];
     }
 }
