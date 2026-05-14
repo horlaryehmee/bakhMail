@@ -49,6 +49,12 @@ function createReplyForm(subject = '') {
   };
 }
 
+function normalizeThreadId(threadId) {
+  const value = String(threadId ?? '').trim();
+
+  return /^\d+$/.test(value) ? value : null;
+}
+
 function apiErrorMessage(error, fallback) {
   const firstError = Object.values(error.payload?.errors || {})?.[0]?.[0];
 
@@ -187,15 +193,18 @@ export function ConversationsPage() {
   );
 
   async function loadThread(threadId, { silent = false } = {}) {
-    if (!threadId) {
+    const normalizedThreadId = normalizeThreadId(threadId);
+
+    if (!normalizedThreadId) {
       setActiveThread(null);
+      setActiveThreadId(null);
       return;
     }
 
     setLoadingThread(true);
 
     try {
-      const payload = await api.get(`/api/conversations/${threadId}`);
+      const payload = await api.get(`/api/conversations/${normalizedThreadId}?ref=thread`);
       const thread = payload?.data || payload;
 
       startTransition(() => {
@@ -203,10 +212,22 @@ export function ConversationsPage() {
         setActiveThreadId(thread?.id ?? null);
         setReplyForm(createReplyForm(thread?.subject || ''));
       });
+
+      return thread;
     } catch (error) {
+      if (error.status === 404) {
+        startTransition(() => {
+          setThreads((current) => current.filter((thread) => String(thread.id) !== normalizedThreadId));
+          setActiveThread((current) => (String(current?.id) === normalizedThreadId ? null : current));
+          setActiveThreadId((current) => (String(current) === normalizedThreadId ? null : current));
+        });
+      }
+
       if (!silent) {
         toast.error(apiErrorMessage(error, 'Could not load conversation'));
       }
+
+      return null;
     } finally {
       setLoadingThread(false);
     }
@@ -270,13 +291,20 @@ export function ConversationsPage() {
   }, [activeFolder, accountFilter, deferredSearch, page, location.state?.threadId]);
 
   function selectThread(thread) {
+    const normalizedThreadId = normalizeThreadId(thread?.id);
+
+    if (!normalizedThreadId) {
+      toast.error('This mailbox item is missing its conversation id. Refresh the mailbox and try again.');
+      return;
+    }
+
     startTransition(() => {
-      setActiveThreadId(thread.id);
+      setActiveThreadId(normalizedThreadId);
       setActiveThread({ ...thread, messages: [] });
       setReplyForm(createReplyForm(thread.subject || ''));
     });
 
-    loadThread(thread.id);
+    loadThread(normalizedThreadId);
   }
 
   function updateSearch(value) {
@@ -297,14 +325,17 @@ export function ConversationsPage() {
   async function handleReply(event) {
     event.preventDefault();
 
-    if (!activeThread) {
+    const normalizedThreadId = normalizeThreadId(activeThread?.id);
+
+    if (!normalizedThreadId) {
+      toast.error('Select a valid mailbox conversation before sending a reply.');
       return;
     }
 
     setSendingReply(true);
 
     try {
-      const payload = await api.post(`/api/conversations/${activeThread.id}/reply`, replyForm);
+      const payload = await api.post(`/api/conversations/${normalizedThreadId}/reply?ref=thread`, replyForm);
       const updatedThread = payload?.data || payload;
 
       if (!updatedThread?.id) {
@@ -322,6 +353,14 @@ export function ConversationsPage() {
 
       toast.success('Reply sent');
     } catch (error) {
+      if (error.status === 404) {
+        startTransition(() => {
+          setThreads((current) => current.filter((thread) => String(thread.id) !== normalizedThreadId));
+          setActiveThread(null);
+          setActiveThreadId(null);
+        });
+      }
+
       toast.error(apiErrorMessage(error, 'Could not send reply'));
     } finally {
       setSendingReply(false);

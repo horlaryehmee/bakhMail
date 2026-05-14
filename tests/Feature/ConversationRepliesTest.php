@@ -125,4 +125,61 @@ class ConversationRepliesTest extends TestCase
 
         $this->assertSame('failed', EmailLog::query()->sole()->event_type);
     }
+
+    public function test_conversation_show_resolves_legacy_email_log_reference(): void
+    {
+        $user = User::factory()->admin()->create();
+        $account = EmailAccount::query()->create([
+            'user_id' => $user->id,
+            'name' => 'Primary Sender',
+            'from_name' => 'Primary Sender',
+            'email_address' => 'sender@example.com',
+            'provider' => 'custom',
+            'status' => 'active',
+        ]);
+        $contact = Contact::query()->create([
+            'user_id' => $user->id,
+            'email' => 'lead@example.com',
+            'first_name' => 'Lead',
+            'unsubscribe_token' => 'unsubscribe-token',
+            'status' => 'active',
+        ]);
+
+        EmailLog::query()->create([
+            'user_id' => $user->id,
+            'direction' => 'outbound',
+            'event_type' => 'sent',
+            'subject' => 'Earlier send',
+        ]);
+
+        $thread = ConversationThread::query()->create([
+            'user_id' => $user->id,
+            'contact_id' => $contact->id,
+            'email_account_id' => $account->id,
+            'subject' => 'Intro thread',
+            'status' => 'open',
+            'last_message_at' => now(),
+        ]);
+        $legacyLog = EmailLog::query()->create([
+            'user_id' => $user->id,
+            'contact_id' => $contact->id,
+            'email_account_id' => $account->id,
+            'conversation_thread_id' => $thread->id,
+            'direction' => 'inbound',
+            'event_type' => 'replied',
+            'subject' => 'Re: Intro thread',
+            'sender_email' => 'lead@example.com',
+            'recipient_email' => 'sender@example.com',
+            'body_preview' => 'Legacy id body.',
+            'sent_at' => now(),
+        ]);
+
+        $this->assertNotSame($thread->id, $legacyLog->id);
+
+        $response = $this->actingAs($user)->getJson("/api/conversations/{$legacyLog->id}");
+
+        $response->assertOk()
+            ->assertJsonPath('data.id', $thread->id)
+            ->assertJsonPath('data.messages.0.body_preview', 'Legacy id body.');
+    }
 }

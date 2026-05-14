@@ -89,9 +89,9 @@ class ConversationController extends Controller
         ]);
     }
 
-    public function show(Request $request, ConversationThread $thread): JsonResponse
+    public function show(Request $request, string $thread): JsonResponse
     {
-        abort_unless($thread->user_id === $request->user()->id, 404);
+        $thread = $this->resolveThreadReference($request, $thread);
         $thread->load([
             'contact',
             'campaign',
@@ -134,9 +134,9 @@ class ConversationController extends Controller
         ]);
     }
 
-    public function reply(Request $request, ConversationThread $thread): JsonResponse
+    public function reply(Request $request, string $thread): JsonResponse
     {
-        abort_unless($thread->user_id === $request->user()->id, 404);
+        $thread = $this->resolveThreadReference($request, $thread);
         $thread->load(['contact', 'emailAccount', 'campaign']);
 
         if (! $thread->contact) {
@@ -277,6 +277,64 @@ class ConversationController extends Controller
         if ($accountId !== '' && $accountId !== 'all') {
             $query->where('email_account_id', $accountId);
         }
+    }
+
+    private function resolveThreadReference(Request $request, string $reference): ConversationThread
+    {
+        $reference = trim($reference);
+
+        if ($reference === '' || ! ctype_digit($reference)) {
+            abort(404, 'This mailbox item is no longer available. Refresh the mailbox and choose the conversation again.');
+        }
+
+        $userId = $request->user()->id;
+        $id = (int) $reference;
+        $preferThreadId = $request->query('ref') === 'thread';
+
+        if (! $preferThreadId) {
+            $thread = $this->resolveThreadFromEmailLogReference($userId, $id);
+
+            if ($thread) {
+                return $thread;
+            }
+        }
+
+        $thread = ConversationThread::query()
+            ->where('user_id', $userId)
+            ->find($id);
+
+        if ($thread) {
+            return $thread;
+        }
+
+        if ($preferThreadId) {
+            $thread = $this->resolveThreadFromEmailLogReference($userId, $id);
+
+            if ($thread) {
+                return $thread;
+            }
+        }
+
+        abort(404, 'This mailbox item is no longer available. Refresh the mailbox and choose the conversation again.');
+    }
+
+    private function resolveThreadFromEmailLogReference(int $userId, int $id): ?ConversationThread
+    {
+        // Older reply screens used email-log ids in some links. Resolve those
+        // to their owning thread so stale browser assets do not break mailbox use.
+        $log = EmailLog::query()
+            ->where('user_id', $userId)
+            ->whereKey($id)
+            ->whereNotNull('conversation_thread_id')
+            ->first();
+
+        if ($log) {
+            return ConversationThread::query()
+                ->where('user_id', $userId)
+                ->find($log->conversation_thread_id);
+        }
+
+        return null;
     }
 
     private function applyFolderFilter(Builder $query, string $folder): void
