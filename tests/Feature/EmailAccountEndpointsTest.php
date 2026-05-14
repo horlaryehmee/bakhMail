@@ -94,4 +94,33 @@ class EmailAccountEndpointsTest extends TestCase
             'id' => $account->id,
         ]);
     }
+
+    public function test_sync_replies_endpoint_skips_unresolvable_imap_hosts_without_failing(): void
+    {
+        $user = User::factory()->admin()->create();
+        $account = EmailAccount::query()->create([
+            'user_id' => $user->id,
+            'name' => 'Inbound Sender',
+            'from_name' => 'Inbound Sender',
+            'email_address' => 'inbound@example.com',
+            'provider' => 'custom',
+            'status' => 'active',
+            'smtp_host' => 'smtp.example.com',
+            'smtp_port' => 587,
+            'smtp_encryption' => 'tls',
+            'smtp_username' => 'inbound@example.com',
+            'smtp_password' => 'secret',
+            'imap_host' => 'https://imap.invalid.example/path',
+            'imap_port' => 993,
+            'imap_encryption' => 'ssl',
+            'imap_username' => 'inbound@example.com',
+            'imap_password' => 'secret',
+        ]);
+
+        $this->actingAs($user)->postJson("/api/email-accounts/{$account->id}/sync-replies")
+            ->assertOk()
+            ->assertJsonPath('status', 'synced')
+            ->assertJsonPath('count', 0)
+            ->assertJsonPath('imap.ready', false);
+    }
 }

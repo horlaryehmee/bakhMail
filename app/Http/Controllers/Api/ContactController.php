@@ -316,6 +316,10 @@ class ContactController extends Controller
                 'sender_email' => $account->email_address,
                 'tracking_token' => (string) Str::uuid(),
                 'unsubscribe_token' => $contact->unsubscribe_token,
+                'metadata' => [
+                    'body_html' => trim((string) $validated['body_html']),
+                    'body_text' => trim((string) ($validated['body_text'] ?? strip_tags((string) $validated['body_html']))),
+                ],
             ]);
 
             $htmlBody = trim((string) $validated['body_html']);
@@ -504,6 +508,7 @@ class ContactController extends Controller
             'recipient_email' => $log->recipient_email,
             'provider_message_id' => $log->provider_message_id,
             'in_reply_to' => $log->in_reply_to,
+            'body_text' => $log->metadata['body_text'] ?? null,
             'sent_at' => $log->sent_at?->toIso8601String(),
             'opened_at' => $log->opened_at?->toIso8601String(),
             'clicked_at' => $log->clicked_at?->toIso8601String(),

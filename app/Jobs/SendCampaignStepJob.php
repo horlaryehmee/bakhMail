@@ -102,6 +102,12 @@ class SendCampaignStepJob implements ShouldQueue
         $text = $step->body_text
             ? $placeholders->render($step->body_text, $recipient->contact, $recipient->campaign, $recipient->emailAccount)
             : strip_tags($html);
+        $log->update([
+            'metadata' => [
+                'body_html' => $html,
+                'body_text' => $text,
+            ],
+        ]);
         $html = $tracking->decorate($log, $html);
 
         $headers = [];

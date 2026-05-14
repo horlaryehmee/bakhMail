@@ -163,7 +163,9 @@ export function ConversationsPage() {
                       </span>
                     </div>
                     <h3 className="mt-3 text-lg font-semibold text-slate-950">{message.subject}</h3>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-600">{message.body_preview}</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-600">
+                      {message.body_text || message.body_preview || 'No message body available yet.'}
+                    </p>
                   </div>
                 ))}
               </div>

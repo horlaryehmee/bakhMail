@@ -48,6 +48,7 @@ class ConversationController extends Controller
                     'event_type' => $log->event_type,
                     'subject' => $log->subject,
                     'body_preview' => $log->body_preview,
+                    'body_text' => $log->metadata['body_text'] ?? null,
                     'sent_at' => $log->sent_at?->toIso8601String(),
                 ])->all(),
             ])->all(),
@@ -76,6 +77,7 @@ class ConversationController extends Controller
                     'event_type' => $log->event_type,
                     'subject' => $log->subject,
                     'body_preview' => $log->body_preview,
+                    'body_text' => $log->metadata['body_text'] ?? null,
                     'sender_email' => $log->sender_email,
                     'recipient_email' => $log->recipient_email,
                     'sent_at' => $log->sent_at?->toIso8601String(),
@@ -126,6 +128,10 @@ class ConversationController extends Controller
             'sender_email' => $thread->emailAccount->email_address,
             'tracking_token' => (string) Str::uuid(),
             'unsubscribe_token' => $thread->contact->unsubscribe_token,
+            'metadata' => [
+                'body_html' => $htmlBody,
+                'body_text' => $textBody,
+            ],
         ]);
 
         $lastMessageId = $thread->emailLogs()

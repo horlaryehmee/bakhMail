@@ -52,8 +52,14 @@ class DynamicSmtpMailer
             return 'native://default';
         }
 
-        if (! $account->smtp_host || ! $account->smtp_port) {
+        $host = $this->normalizeHost($account->smtp_host);
+
+        if (! $host || ! $account->smtp_port) {
             return null;
+        }
+
+        if (! $this->isResolvableHost($host)) {
+            throw new RuntimeException('SMTP host does not resolve. Update the mailbox SMTP host and try again.');
         }
 
         $authSegment = '';
@@ -71,9 +77,34 @@ class DynamicSmtpMailer
         return sprintf(
             'smtp://%s%s:%s%s',
             $authSegment,
-            $account->smtp_host,
+            $host,
             $account->smtp_port,
             $account->smtp_encryption ? '?encryption='.$account->smtp_encryption : ''
         );
+    }
+
+    private function normalizeHost(?string $host): ?string
+    {
+        $host = strtolower(trim((string) $host));
+
+        if ($host === '') {
+            return null;
+        }
+
+        $host = preg_replace('#^[a-z][a-z0-9+.-]*://#i', '', $host) ?? $host;
+        $host = explode('/', $host, 2)[0];
+        $host = explode(':', $host, 2)[0];
+        $host = trim($host, " \t\n\r\0\x0B.");
+
+        return $host !== '' ? $host : null;
+    }
+
+    private function isResolvableHost(string $host): bool
+    {
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return true;
+        }
+
+        return gethostbyname($host) !== $host;
     }
 }

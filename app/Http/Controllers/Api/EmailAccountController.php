@@ -229,6 +229,12 @@ class EmailAccountController extends Controller
             'metadata' => ['nullable', 'array'],
         ]);
 
+        foreach (['smtp_host', 'imap_host'] as $hostField) {
+            if (array_key_exists($hostField, $validated)) {
+                $validated[$hostField] = $this->normalizeHost($validated[$hostField]);
+            }
+        }
+
         if (($validated['provider'] ?? 'custom') !== 'php_mail') {
             if (blank($validated['smtp_host'] ?? null) || blank($validated['smtp_port'] ?? null)) {
                 throw ValidationException::withMessages([
@@ -292,7 +298,7 @@ class EmailAccountController extends Controller
 
     private function imapDiagnostics(EmailAccount $account, bool $deepCheck = true): array
     {
-        $host = trim((string) $account->imap_host);
+        $host = (string) $this->normalizeHost($account->imap_host);
         $resolves = $this->hostResolves($host);
 
         if (! $account->hasImapConfiguration()) {
@@ -354,6 +360,8 @@ class EmailAccountController extends Controller
         });
 
         try {
+            imap_errors();
+            imap_alerts();
             $connection = imap_open($mailbox, $account->imap_username, $account->imap_password ?? '');
         } finally {
             restore_error_handler();
@@ -387,5 +395,21 @@ class EmailAccountController extends Controller
         }
 
         return gethostbyname($host) !== $host;
+    }
+
+    private function normalizeHost(?string $host): ?string
+    {
+        $host = strtolower(trim((string) $host));
+
+        if ($host === '') {
+            return null;
+        }
+
+        $host = preg_replace('#^[a-z][a-z0-9+.-]*://#i', '', $host) ?? $host;
+        $host = explode('/', $host, 2)[0];
+        $host = explode(':', $host, 2)[0];
+        $host = trim($host, " \t\n\r\0\x0B.");
+
+        return $host !== '' ? $host : null;
     }
 }
