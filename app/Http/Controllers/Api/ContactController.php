@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ContactController extends Controller
@@ -338,13 +339,19 @@ class ContactController extends Controller
                 $headers['References'] = $lastMessageId;
             }
 
-            $sendResult = $this->dynamicSmtpMailer->send($account, [
-                'to' => $contact->email,
-                'subject' => $validated['subject'],
-                'html' => $html,
-                'text' => $text,
-                'headers' => $headers,
-            ]);
+            try {
+                $sendResult = $this->dynamicSmtpMailer->send($account, [
+                    'to' => $contact->email,
+                    'subject' => $validated['subject'],
+                    'html' => $html,
+                    'text' => $text,
+                    'headers' => $headers,
+                ]);
+            } catch (RuntimeException $exception) {
+                throw ValidationException::withMessages([
+                    'email_account_id' => $exception->getMessage(),
+                ]);
+            }
 
             $log->update([
                 'event_type' => 'sent',

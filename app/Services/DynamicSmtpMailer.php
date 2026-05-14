@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\EmailAccount;
 use RuntimeException;
 use Symfony\Component\Mailer\Transport;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\Email;
 
@@ -39,7 +40,11 @@ class DynamicSmtpMailer
             $email->getHeaders()->addTextHeader($name, $value);
         }
 
-        $sent = $transport->send($email);
+        try {
+            $sent = $transport->send($email);
+        } catch (TransportExceptionInterface $exception) {
+            throw new RuntimeException($this->friendlyTransportMessage($exception->getMessage()), previous: $exception);
+        }
 
         return [
             'message_id' => $sent->getMessageId(),
@@ -74,12 +79,17 @@ class DynamicSmtpMailer
             $authSegment .= '@';
         }
 
+        $query = http_build_query(array_filter([
+            'encryption' => $account->smtp_encryption ?: null,
+            'timeout' => max(3, (int) config('bulkmail.smtp_timeout_seconds', 8)),
+        ]));
+
         return sprintf(
             'smtp://%s%s:%s%s',
             $authSegment,
             $host,
             $account->smtp_port,
-            $account->smtp_encryption ? '?encryption='.$account->smtp_encryption : ''
+            $query !== '' ? '?'.$query : ''
         );
     }
 
@@ -106,5 +116,24 @@ class DynamicSmtpMailer
         }
 
         return gethostbyname($host) !== $host;
+    }
+
+    private function friendlyTransportMessage(string $message): string
+    {
+        $message = trim($message);
+
+        if ($message === '') {
+            return 'SMTP connection failed. Check the mailbox settings and try again.';
+        }
+
+        if (str_contains($message, 'Connection timed out')) {
+            return 'SMTP connection timed out. Check the mailbox host, port, and firewall settings, then try again.';
+        }
+
+        if (str_contains($message, 'php_network_getaddresses') || str_contains($message, 'getaddrinfo')) {
+            return 'SMTP host does not resolve. Update the mailbox SMTP host and try again.';
+        }
+
+        return $message;
     }
 }
