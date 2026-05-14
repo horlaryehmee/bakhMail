@@ -55,7 +55,11 @@ return Application::configure(basePath: dirname(__DIR__))
                 : $exception->getMessage();
 
             return response()->json([
-                'message' => $message ?: 'Request failed.',
+                'message' => $message ?: match ($status) {
+                    404 => 'The requested mailbox item was not found. Refresh the replies page and try again.',
+                    419 => 'Your session expired. Refresh the page and sign in again.',
+                    default => 'The request could not be completed. Refresh the page and try again.',
+                },
             ], $status);
         });
     })->create();
