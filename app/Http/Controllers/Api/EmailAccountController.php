@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 class EmailAccountController extends Controller
 {
@@ -144,12 +145,18 @@ class EmailAccountController extends Controller
         $subject = 'BakhMail account test';
         $html = '<p>Your SMTP connection is active and ready for campaign traffic.</p>';
 
-        $result = $this->dynamicSmtpMailer->send($emailAccount, [
-            'to' => $to,
-            'subject' => $subject,
-            'html' => $html,
-            'text' => strip_tags($html),
-        ]);
+        try {
+            $result = $this->dynamicSmtpMailer->send($emailAccount, [
+                'to' => $to,
+                'subject' => $subject,
+                'html' => $html,
+                'text' => strip_tags($html),
+            ]);
+        } catch (RuntimeException $exception) {
+            throw ValidationException::withMessages([
+                'smtp_host' => $exception->getMessage(),
+            ]);
+        }
 
         $this->activityLogger->log($request->user(), 'accounts.tested', $emailAccount, $request, ['to' => $to], "Sent an SMTP test message to {$to}.");
 
@@ -277,6 +284,7 @@ class EmailAccountController extends Controller
             'metadata' => $account->metadata ?? [],
             'sent_count' => $account->sent_count ?? 0,
             'smtp_configured' => $account->provider === 'php_mail' || (bool) ($account->smtp_host && $account->smtp_port),
+            'smtp' => $this->dynamicSmtpMailer->diagnostics($account),
             'imap_configured' => $account->hasImapConfiguration(),
             'imap' => $imap,
         ];

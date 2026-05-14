@@ -80,7 +80,8 @@ export function EmailAccountsPage() {
       setEditingId(null);
       load();
     } catch (error) {
-      toast.error(error.payload?.message || error.message || 'Could not save mailbox');
+      const firstError = Object.values(error.payload?.errors || {})?.[0]?.[0];
+      toast.error(firstError || error.payload?.message || error.message || 'Could not save mailbox');
     }
   }
 
@@ -95,7 +96,8 @@ export function EmailAccountsPage() {
       await api.post(`/api/email-accounts/${accountId}/test-connection`, {});
       toast.success('Test email sent');
     } catch (error) {
-      toast.error(error.payload?.message || error.message || 'SMTP test failed');
+      const firstError = Object.values(error.payload?.errors || {})?.[0]?.[0];
+      toast.error(firstError || error.payload?.message || error.message || 'SMTP test failed');
     }
   }
 
@@ -174,6 +176,7 @@ export function EmailAccountsPage() {
                   <th>Mailbox</th>
                   <th>Provider</th>
                   <th>Health</th>
+                  <th>SMTP</th>
                   <th>IMAP</th>
                   <th className="text-right">Actions</th>
                 </tr>
@@ -192,6 +195,22 @@ export function EmailAccountsPage() {
                       </td>
                       <td>
                         <StatusBadge status={`${account.health_score || 0} health`} tone={account.health_score >= 80 ? 'emerald' : account.health_score >= 60 ? 'amber' : 'rose'} />
+                      </td>
+                      <td>
+                        <div className="space-y-2">
+                          <StatusBadge
+                            status={account.smtp?.ready ? 'ready' : 'issue'}
+                            tone={account.smtp?.ready ? 'emerald' : 'rose'}
+                          />
+                          <div className="max-w-[240px] text-sm text-slate-500">
+                            {account.smtp?.message || (account.smtp_configured ? 'SMTP configured' : 'SMTP incomplete')}
+                          </div>
+                          {account.smtp?.effective_host ? (
+                            <div className="text-xs text-slate-400">
+                              Active host: {account.smtp.effective_host}
+                            </div>
+                          ) : null}
+                        </div>
                       </td>
                       <td>
                         <div className="space-y-2">
@@ -230,7 +249,7 @@ export function EmailAccountsPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5}>
+                    <td colSpan={6}>
                       <div className="empty-panel m-4 p-6 text-center text-sm">
                         No sender accounts are connected yet.
                       </div>
